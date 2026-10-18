@@ -1,5 +1,14 @@
 # releaseproof
 
+## 0.1.1
+
+### Patch Changes
+
+- [`fb219f7`](https://github.com/ujjwalv01/releaseproof/commit/fb219f7b38854c0ed4e1707a5b461e4523255534) Thanks [@ujjwalv01](https://github.com/ujjwalv01)! - First release through npm staged publishing: built in GitHub Actions, staged with
+  provenance by a stage-only trusted publisher, checked by releaseproof's own action
+  against the staged tarball, then approved with 2FA. No code changes; the README now
+  documents `npx releaseproof check <name>@<version>`.
+
 ## 0.1.0
 
 ### Minor Changes
