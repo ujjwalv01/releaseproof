@@ -72,7 +72,8 @@ Staged, not yet approved versions: `node packages/cli/dist/index.js check --stag
 Options: `--repo <url>` (the repository you expect; with `--commit <sha>` it is the source
 to rebuild from when there is no provenance), `--node <major>` / `--image <image>` /
 `--build-command <cmd>` to override the build plan, `--memory <size>` for the container
-memory limit (default `4g`; big TypeScript builds may need more), `--json` for the full report,
+memory limit (default `4g`; big TypeScript builds may need more), `--json` for the full report
+(fields are described in [docs/json-report.md](./docs/json-report.md)),
 `--offline` to skip refreshing the Sigstore trust root, `--keep-volume` to inspect the
 build afterwards. Every rule and severity is documented in [docs/rules.md](./docs/rules.md).
 

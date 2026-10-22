@@ -12,6 +12,9 @@ the same inputs always produce the same findings.
 | `DIFFERS FROM SOURCE` | 1 | Any file differs (changed, missing or added), or any `critical`/`high` finding, even when the files match (for example a forged provenance claim). |
 | `COULD NOT VERIFY` | 2 | No source to rebuild from (no verified provenance and no `--repo`/`--commit`), the rebuild failed, or a tarball could not be read. Never read this as "safe"; findings that need attention are still listed. |
 
+The same statuses, findings and exit codes appear in the machine-readable report; see
+[json-report.md](./json-report.md).
+
 Normalization ignores timestamps, ownership, entry order, compression and permission bits
 (the last are shown as info). Everything else counts.
 
