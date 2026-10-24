@@ -86,6 +86,25 @@ describe("formatReport", () => {
     expect(formatReport(report({ rebuild: undefined }))).not.toContain("image digest");
   });
 
+  it("links the Rekor transparency log entry of a verified provenance", () => {
+    const input = report();
+    input.provenance.transparencyLog = { logIndex: "3310501741", integratedTime: "1792323552" };
+    const text = formatReport(input);
+    expect(text).toContain(
+      "             log https://search.sigstore.dev/?logIndex=3310501741, integrated 2026-10-18T11:39:12.000Z\n",
+    );
+  });
+
+  it("prints no log line without a transparency log entry or with a malformed index", () => {
+    expect(formatReport(report())).not.toContain("search.sigstore.dev");
+    const odd = report();
+    odd.provenance.transparencyLog = { logIndex: "12 OR 1=1", integratedTime: "1792323552" };
+    expect(formatReport(odd)).not.toContain("search.sigstore.dev");
+    const noTime = report();
+    noTime.provenance.transparencyLog = { logIndex: "7", integratedTime: "soon" };
+    expect(formatReport(noTime)).toContain("log https://search.sigstore.dev/?logIndex=7\n");
+  });
+
   it("prints a compact, readable report for a match", () => {
     const text = formatReport(report());
     expect(text).toBe(`releaseproof check sigstore@5.0.0

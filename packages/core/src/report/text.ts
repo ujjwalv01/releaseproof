@@ -29,6 +29,23 @@ function shortRepo(repository: string): string {
   return repository.replace(/^https:\/\/github\.com\//, "");
 }
 
+/**
+ * One line pointing at the Rekor entry of a verified bundle. The values were checked by
+ * sigstore, but they still end up in a URL, so only an all-digit log index is printed and
+ * the integration time (seconds since the epoch) is shown as a date only when it parses.
+ */
+function transparencyLogLine(
+  log: CheckReport["provenance"]["transparencyLog"],
+): string | undefined {
+  if (!log || !/^\d+$/.test(log.logIndex)) {
+    return undefined;
+  }
+  const seconds = /^\d+$/.test(log.integratedTime) ? Number(log.integratedTime) : Number.NaN;
+  const date = new Date(seconds * 1000);
+  const when = Number.isNaN(date.getTime()) ? "" : `, integrated ${date.toISOString()}`;
+  return `log https://search.sigstore.dev/?logIndex=${log.logIndex}${when}`;
+}
+
 function provenanceLines(report: CheckReport): string {
   const { provenance } = report;
   const status = provenance.status.toUpperCase();
@@ -45,6 +62,10 @@ function provenanceLines(report: CheckReport): string {
     ].filter((part) => part !== "");
     if (details.length > 0) {
       out += cont(details.join(", "));
+    }
+    const log = transparencyLogLine(provenance.transparencyLog);
+    if (log) {
+      out += cont(log);
     }
     return out;
   }
