@@ -79,6 +79,9 @@ build afterwards. Every rule and severity is documented in [docs/rules.md](./doc
 
 Requirements: Node 22+, Docker. No account, no API key, no telemetry.
 
+Questions after a first run, such as why a package reports COULD NOT VERIFY or how to check a
+staged version, are answered in the [FAQ](./docs/faq.md).
+
 ## GitHub Action
 
 Run the same check after every release and read the verdict in the job summary:
