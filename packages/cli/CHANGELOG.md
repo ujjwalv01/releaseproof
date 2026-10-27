@@ -1,5 +1,17 @@
 # releaseproof
 
+## 0.2.0
+
+### Minor Changes
+
+- [#36](https://github.com/ujjwalv01/releaseproof/pull/36) [`5beb3c5`](https://github.com/ujjwalv01/releaseproof/commit/5beb3c5e79f6607741708221b6a3445f4fd01671) Thanks [@ujjwalv01](https://github.com/ujjwalv01)! - Staged versions: look the provenance up in the Rekor transparency log by the tarball's SHA-512 and verify it like a registry attestation. A verified entry built from `--repo` certifies the source before approval; `--no-rekor` turns the lookup off.
+
+### Patch Changes
+
+- [#22](https://github.com/ujjwalv01/releaseproof/pull/22) [`05c46ed`](https://github.com/ujjwalv01/releaseproof/commit/05c46edf5566b458211a9bf90225572f865d2fef) Thanks [@abhijeetmhaske295-blip](https://github.com/abhijeetmhaske295-blip)! - Text report: link to the Rekor transparency log entry (with its integration time) when the provenance is verified.
+
+- [#19](https://github.com/ujjwalv01/releaseproof/pull/19) [`f6af3b9`](https://github.com/ujjwalv01/releaseproof/commit/f6af3b9f98c6f69d59cd4d9da6ec18dc57f568f5) Thanks [@Golden007-prog](https://github.com/Golden007-prog)! - Show the Docker image digest in text rebuild reports, shortened to 16 hexadecimal characters. JSON reports retain the full digest.
+
 ## 0.1.1
 
 ### Patch Changes
