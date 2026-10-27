@@ -74,13 +74,21 @@ rule set and severity levels, see [docs/rules.md](rules.md).
 
 ## How do I check a staged version (`--stage`, token requirements)?
 
-npm does not expose the attestations of a staged version until it is approved, so a staged
-check has no certified provenance. Name the source yourself, as for a package without
-provenance:
+npm does not expose the attestations of a staged version until it is approved, but it has
+already written the provenance to the public Rekor transparency log. releaseproof looks the
+staged tarball up there by its SHA-512 and verifies what it finds exactly like a registry
+attestation. Pass the repository and, as a fallback, the commit:
 
 ```bash
 npx releaseproof check --stage <stage-id> --repo https://github.com/<owner>/<repo> --commit <sha>
 ```
+
+- With a verified Rekor entry built from `--repo`, the source is certified by provenance and
+  `--commit` is not used. The report says the provenance was found in Rekor.
+- Otherwise (no entry, an entry from another repository, or one that does not verify; anyone
+  can write to Rekor, so such entries are only notes) the check rebuilds from `--commit`, and
+  the verdict says the source was "named by you, not certified by provenance".
+- The lookup sends the tarball's SHA-512 to `rekor.sigstore.dev`. `--no-rekor` turns it off.
 
 - The stage id is the UUID printed by `npm stage publish` and listed by `npm stage list <package>`.
 - You may add `<name>@<version>` as the package argument; releaseproof then checks that the

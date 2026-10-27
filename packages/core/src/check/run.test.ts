@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { FIXTURE_REPOSITORY, verifiedProvenance } from "../../test/context.js";
 import { packFixture } from "../../test/tarballs.js";
+import { ToolError } from "../errors.js";
 import { computeDigests } from "../fetch/digests.js";
 import type { ReleaseArtifact } from "../fetch/types.js";
 import type { ProvenanceResult } from "../provenance/types.js";
@@ -43,6 +44,10 @@ function depsFor(input: {
     }),
     fetchRegistryKeys: async () => [],
     verifyProvenance: async () => input.provenance ?? verifiedProvenance(),
+    findRekorProvenance: async () => ({
+      provenance: undefined,
+      notes: ["the Rekor transparency log has no provenance for this tarball"],
+    }),
     rebuildPackage: async (source, target, options) => {
       calls.rebuild.push({ source, target, options });
       const tarball = await packFixture(input.rebuilt ?? "clean");
@@ -209,6 +214,90 @@ describe("runCheck with a staged version", () => {
     expect(report.package.origin).toBe("staged");
     expect(report.verdict.status).toBe("matches-source");
     expect(report.verdict.summary).toContain("not certified by provenance");
+  });
+
+  it("certifies the source with provenance found in Rekor, ahead of --commit", async () => {
+    const deps = depsFor({ release: "clean", provenance: missing });
+    const fromRekor = verifiedProvenance({
+      attestationSource: "rekor",
+      publishAttestation: { status: "missing" },
+    });
+    const findRekor = vi.fn<CheckDeps["findRekorProvenance"]>(async () => ({
+      provenance: fromRekor,
+      notes: [],
+    }));
+    const log = vi.fn();
+    const report = await runCheck(
+      {
+        stageId,
+        repository: FIXTURE_REPOSITORY,
+        commit: "b".repeat(40),
+        offline: true,
+        tufCachePath: "/cache",
+        log,
+      },
+      { ...deps, findRekorProvenance: findRekor },
+    );
+
+    const artifact = await deps.fetchStaged(stageId);
+    expect(findRekor).toHaveBeenCalledWith(
+      { purl: artifact.purl, sha512Hex: artifact.digests.sha512Hex },
+      { expectedRepository: FIXTURE_REPOSITORY, offline: true, tufCachePath: "/cache" },
+    );
+    expect(report.provenance).toBe(fromRekor);
+    expect(report.source).toMatchObject({ commit: "a".repeat(40), verified: true });
+    expect(report.verdict.status).toBe("matches-source");
+    expect(report.verdict.summary).not.toContain("not certified");
+    // A staged version is attested by the registry only on approval; that is not a finding.
+    expect(report.verdict.findings.map((f) => f.id)).not.toContain("publish-attestation-missing");
+    expect(log).toHaveBeenCalledWith("provenance: verified (from Rekor)");
+  });
+
+  it("falls back to the named source with Rekor's notes when nothing there counts", async () => {
+    const deps = depsFor({ release: "clean", provenance: missing });
+    const report = await runCheck(
+      { stageId, repository: FIXTURE_REPOSITORY, commit: "b".repeat(40) },
+      deps,
+    );
+    expect(report.provenance.status).toBe("missing");
+    expect(report.provenance.warnings).toEqual([
+      "the Rekor transparency log has no provenance for this tarball",
+    ]);
+    expect(report.source).toMatchObject({ commit: "b".repeat(40), verified: false });
+    expect(missing.warnings).toEqual([]);
+  });
+
+  it("reports a failed Rekor lookup as a note, not as a tool error", async () => {
+    const deps = depsFor({ release: "clean", provenance: missing });
+    const report = await runCheck(
+      { stageId, repository: FIXTURE_REPOSITORY, commit: "b".repeat(40) },
+      {
+        ...deps,
+        findRekorProvenance: async () => {
+          throw new ToolError("Rekor returned HTTP 503 for api/v1/index/retrieve");
+        },
+      },
+    );
+    expect(report.provenance.warnings).toEqual([
+      "Rekor lookup failed: Rekor returned HTTP 503 for api/v1/index/retrieve",
+    ]);
+    expect(report.verdict.status).toBe("matches-source");
+  });
+
+  it("does not ask Rekor without --repo, with rekor: false, or for a published version", async () => {
+    const findRekor = vi.fn<CheckDeps["findRekorProvenance"]>();
+    const deps = {
+      ...depsFor({ release: "clean", provenance: missing }),
+      findRekorProvenance: findRekor,
+    };
+
+    const noRepo = await runCheck({ stageId }, deps);
+    expect(noRepo.provenance.warnings).toEqual([
+      "pass --repo to look up the staged version's provenance in the Rekor transparency log",
+    ]);
+    await runCheck({ stageId, repository: FIXTURE_REPOSITORY, rekor: false }, deps);
+    await runCheck({ spec: "@releaseproof/fixture@1.0.0", repository: FIXTURE_REPOSITORY }, deps);
+    expect(findRekor).not.toHaveBeenCalled();
   });
 
   it("cross-checks the staged item against a package spec when both are given", async () => {

@@ -21,7 +21,9 @@ the package's own repository after a release:
   repository is a **critical** finding. This is the strongest check the action adds over the
   CLI: it knows which repository it is running in.
 - `commit` defaults to `github.sha`, used only when the version has **no verified
-  provenance**; the verdict then says the source was named, not certified. Set it to the
+  provenance**; the verdict then says the source was named, not certified. For a staged
+  version, provenance found in the Rekor transparency log and built from `repo` counts as
+  verified. Set it to the
   empty string to disable the fallback.
 
 ## 2. Threat model

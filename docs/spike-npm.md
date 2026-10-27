@@ -302,8 +302,14 @@ a granular access token), inspected it, and the staged item was then rejected by
    "Provenance statement published to transparency log: logIndex=3309737268". The
    attestation exists in Rekor; only the registry's endpoint hides it until approval.
    Consequence: staged checks run without provenance and say so (`--repo`/`--commit` name
-   the source). Follow-up idea: look the DSSE entry up in Rekor by the tarball digest and
-   verify it the same way — that would give staged checks certified provenance.
+   the source). Follow-up, implemented in `packages/core/src/provenance/rekor.ts`: the
+   staged tarball is looked up in Rekor by its SHA-512 (the search index holds the subject
+   digests of in-toto statements). npm writes `dsse` v0.0.1 entries, which store the
+   certificate, the signature and the SHA-256 of the statement but not the statement, so
+   releaseproof rebuilds npm's statement from the certificate (every field in it comes
+   from a GitHub variable that Fulcio also certifies) and uses it only when its hash is the
+   signed one. The result is turned into a Sigstore bundle and verified like a registry
+   attestation; only an entry built from the expected repository counts.
 2. **A "Read and write (stage only)" granular token is enough** for `npm stage publish`,
    `list`, `view` and `download`. npm's token form now offers that permission explicitly
    and recommends it over direct publish.

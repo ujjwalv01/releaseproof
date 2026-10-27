@@ -53,7 +53,7 @@ describe("runCheckCommand", () => {
     const { out, err, io: streams } = io();
     const code = await runCheckCommand(
       "x@1.0.0",
-      { repo: "https://github.com/o/r", node: "22", keepVolume: true },
+      { repo: "https://github.com/o/r", node: "22", keepVolume: true, rekor: false },
       streams,
       { runCheck },
     );
@@ -63,6 +63,7 @@ describe("runCheckCommand", () => {
       repository: "https://github.com/o/r",
       nodeMajor: 22,
       keepVolume: true,
+      rekor: false,
     });
     expect(err).toEqual(["… fetching x@1.0.0\n"]);
     expect(out.join("")).toContain("Verdict: summary");

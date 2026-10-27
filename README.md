@@ -67,7 +67,10 @@ error). "Could not verify" is never "safe".
 
 Staged, not yet approved versions: `node packages/cli/dist/index.js check --stage <id>
 --repo <url> --commit <sha>` (the stage id from `npm stage list`; needs your npm token in
-`NPM_TOKEN` or `.npmrc`; staged versions carry no provenance yet, so you name the source).
+`NPM_TOKEN` or `.npmrc`). The registry hides a staged version's provenance until approval,
+so releaseproof looks it up in the Rekor transparency log by the tarball's digest; when a
+verified entry from `--repo` is there, the source is certified and `--commit` is only the
+fallback (`--no-rekor` skips the lookup).
 
 Options: `--repo <url>` (the repository you expect; with `--commit <sha>` it is the source
 to rebuild from when there is no provenance), `--node <major>` / `--image <image>` /

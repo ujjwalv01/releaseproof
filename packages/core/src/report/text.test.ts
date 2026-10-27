@@ -95,6 +95,15 @@ describe("formatReport", () => {
     );
   });
 
+  it("says when the provenance was found in Rekor rather than served by the registry", () => {
+    const input = report();
+    input.provenance.attestationSource = "rekor";
+    expect(formatReport(input)).toContain(
+      "             found in the Rekor transparency log; the registry hides it until approval\n",
+    );
+    expect(formatReport(report())).not.toContain("found in the Rekor");
+  });
+
   it("prints no log line without a transparency log entry or with a malformed index", () => {
     expect(formatReport(report())).not.toContain("search.sigstore.dev");
     const odd = report();

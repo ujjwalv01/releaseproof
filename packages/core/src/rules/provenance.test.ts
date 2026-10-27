@@ -144,4 +144,19 @@ describe("provenanceRules", () => {
       "info:provenance-note",
     ]);
   });
+
+  it("expects no publish attestation on a staged version, which gets one on approval", async () => {
+    const provenance = verifiedProvenance({
+      publishAttestation: { status: "missing" },
+      attestationSource: "rekor",
+    });
+    const published = provenanceRules(await fixtureContext("clean", "clean", { provenance }));
+    expect(published.map((f) => `${f.severity}:${f.id}`)).toEqual([
+      "low:publish-attestation-missing",
+    ]);
+    const staged = provenanceRules(
+      await fixtureContext("clean", "clean", { provenance, origin: "staged" }),
+    );
+    expect(staged).toEqual([]);
+  });
 });
