@@ -19,7 +19,9 @@ the container, make a tampered release read as MATCHES SOURCE, or leak a token.
   network during the build stage.
 - "Could not verify" is never reported as safe.
 - Nothing about your package leaves your machine or CI: the only network calls go to the
-  registry, GitHub (to clone), the Sigstore trust root and the Docker image registry.
+  registry, GitHub (to clone), the Sigstore trust root and the Docker image registry, and,
+  for a staged version, the Rekor transparency log, which receives the tarball's SHA-512
+  (`--no-rekor` turns that lookup off).
 - Tokens are used only to talk to the npm registry (and, in the Action, to open an issue
   when asked). They are never passed into containers.
 

@@ -133,7 +133,8 @@ export function provenanceRules(context: RuleContext): Finding[] {
         title: "the registry's publish attestation does not verify",
         detail: publish.problem ?? "unknown problem",
       });
-    } else if (publish.status === "missing") {
+    } else if (publish.status === "missing" && context.origin !== "staged") {
+      // A staged version gets its publish attestation when it is approved, not before.
       findings.push({
         id: "publish-attestation-missing",
         severity: "low",

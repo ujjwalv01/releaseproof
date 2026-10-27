@@ -67,6 +67,9 @@ function provenanceLines(report: CheckReport): string {
     if (log) {
       out += cont(log);
     }
+    if (provenance.attestationSource === "rekor") {
+      out += cont("found in the Rekor transparency log; the registry hides it until approval");
+    }
     return out;
   }
   const why = provenance.problems.length > 0 ? `  ${provenance.problems.join("; ")}` : "";

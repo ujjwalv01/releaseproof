@@ -89,4 +89,9 @@ export interface ProvenanceResult {
   signerOutsideRepository?: string | undefined;
   publishAttestation: PublishAttestationResult;
   transparencyLog?: { logIndex: string; integratedTime: string } | undefined;
+  /**
+   * `rekor` when the registry hid the provenance (a staged version) and it was found in the
+   * transparency log by the tarball's digest instead. Absent when the registry served it.
+   */
+  attestationSource?: "rekor" | undefined;
 }

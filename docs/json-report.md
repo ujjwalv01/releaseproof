@@ -79,6 +79,7 @@ Each entry of `findings`:
 | `signerOutsideRepository` | string, optional | Set when the signing workflow lives outside the source repository (a reusable workflow). |
 | `publishAttestation` | object | Result for the npm publish attestation: `status` (`verified`, `missing` or `invalid`) and optionally `keyid` and `problem`. |
 | `transparencyLog` | object, optional | `logIndex` and `integratedTime`, both strings. |
+| `attestationSource` | string, optional | `"rekor"` when the registry hid the provenance (a staged version) and it was found in the Rekor transparency log by the tarball's digest instead. Absent when the registry served it. |
 
 | `provenance.status` | Meaning |
 | --- | --- |

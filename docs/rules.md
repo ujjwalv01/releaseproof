@@ -18,7 +18,9 @@ The same statuses, findings and exit codes appear in the machine-readable report
 Normalization ignores timestamps, ownership, entry order, compression and permission bits
 (the last are shown as info). Everything else counts.
 
-The source for the rebuild is the commit named by verified provenance. If there is no
+The source for the rebuild is the commit named by verified provenance. For a staged version,
+whose attestations the registry hides until approval, that provenance may come from the
+Rekor transparency log, and then only from an entry built from `--repo`. If there is no
 verified provenance, `--repo` and `--commit` name it, and the verdict says the source was
 "named by you, not certified by provenance". With verified provenance, `--repo` is an
 expectation: a release built from any other repository is `critical`.
@@ -46,7 +48,7 @@ expectation: a release built from any other repository is `critical`.
 | `provenance-missing` | medium | The registry has no attestations for the version. |
 | `provenance-signer-outside-repository` | medium | The signing workflow lives in another repository (shared reusable release workflows). |
 | `provenance-runner-self-hosted` | low | Built on a self-hosted runner. |
-| `publish-attestation-missing` | low | Provenance verifies but there is no registry publish attestation. |
+| `publish-attestation-missing` | low | Provenance verifies but there is no registry publish attestation. Not reported for staged versions, which get one on approval. |
 | `provenance-note` | info | Warnings from verification, such as ignored unknown attestation types. |
 
 ## package.json rules

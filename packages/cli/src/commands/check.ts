@@ -18,6 +18,8 @@ export interface CheckCommandOptions {
   buildCommand?: string | undefined;
   memory?: string | undefined;
   offline?: boolean | undefined;
+  /** False with --no-rekor. */
+  rekor?: boolean | undefined;
   keepVolume?: boolean | undefined;
   json?: boolean | undefined;
   quiet?: boolean | undefined;
@@ -66,6 +68,7 @@ export async function runCheckCommand(
       buildCommand: options.buildCommand,
       memory: options.memory,
       offline: options.offline,
+      rekor: options.rekor,
       keepVolume: options.keepVolume,
       log: options.quiet ? undefined : (line) => io.stderr(`… ${line}\n`),
     });

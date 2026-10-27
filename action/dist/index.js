@@ -50072,7 +50072,7 @@ var require_key2 = __commonJS({
       if (keyInfo.keyVal.startsWith(PEM_HEADER)) {
         key = crypto_1.default.createPublicKey(keyInfo.keyVal);
       } else {
-        if (!isHex(keyInfo.keyVal)) {
+        if (!isHex2(keyInfo.keyVal)) {
           throw new error_1.CryptoError("Invalid key format");
         }
         key = crypto_1.default.createPublicKey({
@@ -50088,7 +50088,7 @@ var require_key2 = __commonJS({
       if (keyInfo.keyVal.startsWith(PEM_HEADER)) {
         key = crypto_1.default.createPublicKey(keyInfo.keyVal);
       } else {
-        if (!isHex(keyInfo.keyVal)) {
+        if (!isHex2(keyInfo.keyVal)) {
           throw new error_1.CryptoError("Invalid key format");
         }
         key = crypto_1.default.createPublicKey({
@@ -50153,7 +50153,7 @@ var require_key2 = __commonJS({
         return der;
       }
     };
-    var isHex = (key) => /^[0-9a-fA-F]+$/.test(key);
+    var isHex2 = (key) => /^[0-9a-fA-F]+$/.test(key);
   }
 });
 
@@ -64661,8 +64661,28 @@ ${key.key}
 ` };
 }
 
-// ../packages/core/src/provenance/verify.ts
-var import_sigstore = __toESM(require_dist10(), 1);
+// ../packages/core/src/provenance/rekor.ts
+import { createHash as createHash3 } from "crypto";
+
+// ../packages/core/src/rules/repository.ts
+function normalizeGithubRepository(value) {
+  if (!value) {
+    return void 0;
+  }
+  const text = value.trim().replace(/^git\+/, "");
+  const short = text.replace(/^github:/, "");
+  const shorthand = /^([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/.exec(short);
+  if (shorthand && !short.includes(":") && !short.includes("//")) {
+    return `https://github.com/${shorthand[1]}/${shorthand[2]}`.toLowerCase();
+  }
+  const url = /^(?:https?:\/\/|git:\/\/|ssh:\/\/(?:git@)?|git@)(?:www\.)?github\.com[/:]([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?(?:[#?].*)?$/.exec(
+    text
+  );
+  if (url) {
+    return `https://github.com/${url[1]}/${url[2]}`.toLowerCase();
+  }
+  return void 0;
+}
 
 // ../packages/core/src/provenance/der.ts
 function decodeDerUtf8String(bytes) {
@@ -64687,6 +64707,98 @@ function decodeDerUtf8String(bytes) {
     return void 0;
   }
   return Buffer.from(bytes.subarray(offset)).toString("utf8");
+}
+function readTlv(bytes, offset, limit) {
+  if (offset + 2 > limit) {
+    return void 0;
+  }
+  const tag = bytes[offset] ?? 0;
+  if ((tag & 31) === 31) {
+    return void 0;
+  }
+  let length = bytes[offset + 1] ?? 0;
+  let start = offset + 2;
+  if (length & 128) {
+    const count3 = length & 127;
+    if (count3 === 0 || count3 > 4 || start + count3 > limit) {
+      return void 0;
+    }
+    length = 0;
+    for (let i2 = 0; i2 < count3; i2 += 1) {
+      length = length * 256 + (bytes[start + i2] ?? 0);
+    }
+    start += count3;
+  }
+  const end = start + length;
+  return end <= limit ? { tag, start, end } : void 0;
+}
+function children(bytes, parent) {
+  const out = [];
+  let offset = parent.start;
+  while (offset < parent.end) {
+    const child = readTlv(bytes, offset, parent.end);
+    if (!child) {
+      return void 0;
+    }
+    out.push(child);
+    offset = child.end;
+  }
+  return out;
+}
+function decodeOid(bytes) {
+  if (bytes.length === 0) {
+    return void 0;
+  }
+  const arcs = [];
+  let value = 0;
+  for (const byte of bytes) {
+    value = value * 128 + (byte & 127);
+    if (value > Number.MAX_SAFE_INTEGER / 128) {
+      return void 0;
+    }
+    if (!(byte & 128)) {
+      arcs.push(value);
+      value = 0;
+    }
+  }
+  if ((bytes[bytes.length - 1] ?? 0) & 128) {
+    return void 0;
+  }
+  const first = arcs.shift() ?? 0;
+  const top = first < 80 ? Math.floor(first / 40) : 2;
+  return [top, first - top * 40, ...arcs];
+}
+function readCertificateExtensions(der) {
+  const certificate = readTlv(der, 0, der.length);
+  if (certificate?.tag !== 48 || certificate.end !== der.length) {
+    return void 0;
+  }
+  const tbs = children(der, certificate)?.[0];
+  const fields = tbs?.tag === 48 ? children(der, tbs) : void 0;
+  const wrapper = fields?.find((field) => field.tag === 163);
+  if (!wrapper) {
+    return fields ? [] : void 0;
+  }
+  const [list, ...rest] = children(der, wrapper) ?? [];
+  const extensions = list?.tag === 48 && rest.length === 0 ? children(der, list) : void 0;
+  if (!extensions) {
+    return void 0;
+  }
+  const out = [];
+  for (const extension2 of extensions) {
+    const parts = extension2.tag === 48 ? children(der, extension2) : void 0;
+    const oid = parts?.[0];
+    const value = parts?.[parts.length - 1];
+    if (!parts || parts.length < 2 || parts.length > 3 || oid?.tag !== 6 || value?.tag !== 4) {
+      return void 0;
+    }
+    const id = decodeOid(der.subarray(oid.start, oid.end));
+    if (!id) {
+      return void 0;
+    }
+    out.push({ oid: { id }, value: der.subarray(value.start, value.end) });
+  }
+  return out;
 }
 
 // ../packages/core/src/provenance/certificate.ts
@@ -64897,6 +65009,7 @@ function parseGithubPredicate(statement) {
 }
 
 // ../packages/core/src/provenance/verify.ts
+var import_sigstore = __toESM(require_dist10(), 1);
 var GIT_COMMIT_RE2 = /^[0-9a-f]{40}$/;
 var sigstoreVerifier = async (bundle, options) => {
   const verifyOptions = {};
@@ -65170,8 +65283,286 @@ async function verifyProvenance(input, options = {}) {
   return verifyProvenanceEntry(entry, input, result, verifier, bundleOptions);
 }
 
+// ../packages/core/src/provenance/rekor.ts
+var DEFAULT_REKOR_URL = "https://rekor.sigstore.dev/";
+var MAX_REKOR_ENTRIES = 10;
+var BUNDLE_V03 = "application/vnd.dev.sigstore.bundle.v0.3+json";
+var ENTRY_UUID_RE = /^(?:[0-9a-f]{16})?[0-9a-f]{64}$/;
+var HEX_RE = /^(?:[0-9a-f]{2})+$/;
+var BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+function isRecord6(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isBase64(value) {
+  return typeof value === "string" && value.length % 4 === 0 && BASE64_RE.test(value);
+}
+function isHex(value) {
+  return typeof value === "string" && HEX_RE.test(value);
+}
+function isIndex(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+function hexToBase64(hex) {
+  return Buffer.from(hex, "hex").toString("base64");
+}
+async function rekorRequest(path13, options, body) {
+  const url = new URL(path13, options.rekorUrl ?? DEFAULT_REKOR_URL).href;
+  const doFetch = options.fetch ?? fetch;
+  let response;
+  try {
+    const init = {
+      headers: { accept: "application/json", "user-agent": "releaseproof" },
+      signal: AbortSignal.timeout(options.timeoutMs ?? 3e4)
+    };
+    if (body !== void 0) {
+      init.method = "POST";
+      init.headers = { ...init.headers, "content-type": "application/json" };
+      init.body = JSON.stringify(body);
+    }
+    response = await doFetch(url, init);
+  } catch (error2) {
+    throw new ToolError(`Request to ${url} failed: ${errorMessage(error2)}`, { cause: error2 });
+  }
+  if (!response.ok) {
+    throw new ToolError(`Rekor returned HTTP ${response.status} for ${path13}`);
+  }
+  try {
+    return await response.json();
+  } catch (error2) {
+    throw new ToolError(`Rekor returned invalid JSON for ${path13}`, { cause: error2 });
+  }
+}
+function certificateDer(pem) {
+  const match = /^-----BEGIN CERTIFICATE-----\r?\n([A-Za-z0-9+/=\r\n]+)-----END CERTIFICATE-----\r?\n?$/.exec(
+    pem
+  );
+  return match?.[1] ? Buffer.from(match[1].replace(/\s+/g, ""), "base64") : void 0;
+}
+function npmGithubStatement(der, subject) {
+  const oids = readCertificateExtensions(der);
+  if (!oids) {
+    return void 0;
+  }
+  const certificate = extractCertificateIdentity({ oids });
+  const {
+    issuer,
+    sourceRepositoryUri: repository,
+    sourceRepositoryDigest: commit,
+    sourceRepositoryRef: ref,
+    buildConfigUri,
+    buildTrigger,
+    sourceRepositoryId,
+    sourceRepositoryOwnerId,
+    runnerEnvironment,
+    runInvocationUri
+  } = certificate;
+  if (issuer !== GITHUB_ACTIONS_ISSUER || !repository || !commit || !ref || !buildConfigUri || !runnerEnvironment || !runInvocationUri) {
+    return void 0;
+  }
+  const workflow = splitWorkflowUri(buildConfigUri, repository);
+  if (!workflow) {
+    return void 0;
+  }
+  const statement = {
+    _type: INTOTO_STATEMENT_V1,
+    subject: [{ name: subject.purl, digest: { sha512: subject.sha512Hex.toLowerCase() } }],
+    predicateType: SLSA_PROVENANCE_V1,
+    predicate: {
+      buildDefinition: {
+        buildType: GITHUB_WORKFLOW_BUILD_TYPE,
+        externalParameters: {
+          workflow: { ref: workflow.ref, repository, path: workflow.path }
+        },
+        internalParameters: {
+          github: {
+            event_name: buildTrigger,
+            repository_id: sourceRepositoryId,
+            repository_owner_id: sourceRepositoryOwnerId
+          }
+        },
+        resolvedDependencies: [{ uri: `git+${repository}@${ref}`, digest: { gitCommit: commit } }]
+      },
+      runDetails: {
+        builder: { id: `${GITHUB_BUILDER_ID_PREFIX}${runnerEnvironment}` },
+        metadata: { invocationId: runInvocationUri }
+      }
+    }
+  };
+  return Buffer.from(JSON.stringify(statement), "utf8");
+}
+function bundleFromRekorEntry(entry, subject) {
+  if (!isRecord6(entry) || !isBase64(entry.body)) {
+    return { skipped: "malformed log entry" };
+  }
+  const { logIndex, integratedTime, logID, verification } = entry;
+  if (!isIndex(logIndex) || !isIndex(integratedTime) || !isHex(logID) || !isRecord6(verification)) {
+    return { skipped: "malformed log entry" };
+  }
+  let body;
+  try {
+    body = JSON.parse(Buffer.from(entry.body, "base64").toString("utf8"));
+  } catch {
+    return { skipped: `entry ${logIndex} has a malformed body` };
+  }
+  if (!isRecord6(body) || body.kind !== "dsse" || body.apiVersion !== "0.0.1") {
+    const kind = isRecord6(body) ? `${String(body.kind)} ${String(body.apiVersion)}` : "unknown";
+    return { skipped: `entry ${logIndex} is a ${kind} entry, not a DSSE attestation` };
+  }
+  const spec = isRecord6(body.spec) ? body.spec : {};
+  const signatures = Array.isArray(spec.signatures) ? spec.signatures : [];
+  const [signature] = signatures;
+  const payloadHash = isRecord6(spec.payloadHash) ? spec.payloadHash : {};
+  if (signatures.length !== 1 || !isRecord6(signature) || !isBase64(signature.signature) || !isBase64(signature.verifier) || payloadHash.algorithm !== "sha256" || !isHex(payloadHash.value)) {
+    return { skipped: `entry ${logIndex} is not a single-signature DSSE entry` };
+  }
+  const der = certificateDer(Buffer.from(signature.verifier, "base64").toString("utf8"));
+  if (!der) {
+    return { skipped: `entry ${logIndex} is not signed with a certificate` };
+  }
+  const candidates = [];
+  const stored = isRecord6(entry.attestation) ? entry.attestation.data : void 0;
+  if (isBase64(stored)) {
+    candidates.push(Buffer.from(stored, "base64"));
+  }
+  const rebuilt = npmGithubStatement(der, subject);
+  if (rebuilt) {
+    candidates.push(rebuilt);
+  }
+  const payload = candidates.find(
+    (candidate) => createHash3("sha256").update(candidate).digest("hex") === payloadHash.value
+  );
+  if (!payload) {
+    return {
+      skipped: `entry ${logIndex} signs a statement that is not npm's provenance for ${subject.purl}`
+    };
+  }
+  const tlogEntry = {
+    logIndex: String(logIndex),
+    logId: { keyId: hexToBase64(logID) },
+    kindVersion: { kind: body.kind, version: body.apiVersion },
+    integratedTime: String(integratedTime),
+    canonicalizedBody: entry.body
+  };
+  if (isBase64(verification.signedEntryTimestamp)) {
+    tlogEntry.inclusionPromise = { signedEntryTimestamp: verification.signedEntryTimestamp };
+  }
+  const proof = verification.inclusionProof;
+  if (isRecord6(proof)) {
+    const hashes = Array.isArray(proof.hashes) ? proof.hashes : [];
+    if (!isIndex(proof.logIndex) || !isIndex(proof.treeSize) || !isHex(proof.rootHash) || typeof proof.checkpoint !== "string" || !hashes.every(isHex)) {
+      return { skipped: `entry ${logIndex} has a malformed inclusion proof` };
+    }
+    tlogEntry.inclusionProof = {
+      logIndex: String(proof.logIndex),
+      rootHash: hexToBase64(proof.rootHash),
+      treeSize: String(proof.treeSize),
+      hashes: hashes.map(hexToBase64),
+      checkpoint: { envelope: proof.checkpoint }
+    };
+  }
+  return {
+    logIndex,
+    bundle: {
+      mediaType: BUNDLE_V03,
+      verificationMaterial: {
+        certificate: { rawBytes: der.toString("base64") },
+        tlogEntries: [tlogEntry],
+        timestampVerificationData: { rfc3161Timestamps: [] }
+      },
+      dsseEnvelope: {
+        payload: payload.toString("base64"),
+        payloadType: INTOTO_PAYLOAD_TYPE,
+        signatures: [{ sig: signature.signature, keyid: "" }]
+      }
+    }
+  };
+}
+async function findRekorAttestations(subject, options = {}) {
+  const sha512 = subject.sha512Hex.toLowerCase();
+  if (!/^[0-9a-f]{128}$/.test(sha512)) {
+    throw new ToolError(`Not a SHA-512 digest: "${subject.sha512Hex}"`);
+  }
+  const found = await rekorRequest("api/v1/index/retrieve", options, { hash: `sha512:${sha512}` });
+  if (!Array.isArray(found) || !found.every((uuid) => typeof uuid === "string")) {
+    throw new ToolError("Rekor returned an unexpected search result");
+  }
+  const uuids = [...new Set(found.map((uuid) => uuid.toLowerCase()))];
+  const result = { attestations: [], skipped: [] };
+  if (uuids.length > MAX_REKOR_ENTRIES) {
+    result.skipped.push(
+      `Rekor lists ${uuids.length} entries for this tarball, more than the ${MAX_REKOR_ENTRIES} releaseproof checks`
+    );
+    return result;
+  }
+  for (const uuid of uuids) {
+    if (!ENTRY_UUID_RE.test(uuid)) {
+      result.skipped.push(`Rekor returned a malformed entry id "${uuid.slice(0, 80)}"`);
+      continue;
+    }
+    const response = await rekorRequest(`api/v1/log/entries/${uuid}`, options);
+    const entry = isRecord6(response) ? response[uuid] : void 0;
+    const converted = bundleFromRekorEntry(entry, { purl: subject.purl, sha512Hex: sha512 });
+    if ("skipped" in converted) {
+      result.skipped.push(`Rekor ${converted.skipped}`);
+      continue;
+    }
+    result.attestations.push({
+      predicateType: SLSA_PROVENANCE_V1,
+      bundle: converted.bundle,
+      logIndex: converted.logIndex
+    });
+  }
+  result.attestations.sort((a2, b2) => a2.logIndex - b2.logIndex);
+  return result;
+}
+async function findRekorProvenance(subject, options) {
+  const find = options.find ?? findRekorAttestations;
+  const { attestations, skipped } = await find(subject, options);
+  const notes = [...skipped];
+  const expected = normalizeGithubRepository(options.expectedRepository);
+  if (attestations.length === 0) {
+    if (notes.length === 0) {
+      notes.push("the Rekor transparency log has no provenance for this tarball");
+    }
+    return { provenance: void 0, notes };
+  }
+  const accepted = [];
+  for (const { logIndex, ...attestation } of attestations) {
+    const result = await verifyProvenance(
+      { ...subject, attestations: { attestations: [attestation] } },
+      options
+    );
+    const repository = result.source?.repository;
+    if (result.status !== "verified" || !repository) {
+      notes.push(
+        `Rekor entry ${logIndex} is ${result.status}: ${result.problems.join("; ") || "no source"}`
+      );
+    } else if (!expected || normalizeGithubRepository(repository) !== expected) {
+      notes.push(
+        `Rekor entry ${logIndex} was built from ${repository}, not ${options.expectedRepository}; ignored`
+      );
+    } else {
+      accepted.push(result);
+    }
+  }
+  const [first] = accepted;
+  if (!first?.source) {
+    return { provenance: void 0, notes };
+  }
+  const commits = new Set(accepted.map((result) => result.source?.commit));
+  if (commits.size > 1) {
+    notes.push(
+      `Rekor has provenance for this tarball from ${commits.size} different commits of ${first.source.repository}; none is used`
+    );
+    return { provenance: void 0, notes };
+  }
+  first.attestationSource = "rekor";
+  first.warnings.push(...notes);
+  return { provenance: first, notes: [] };
+}
+
 // ../packages/core/src/rebuild/run.ts
-import { createHash as createHash3, randomBytes } from "crypto";
+import { createHash as createHash4, randomBytes } from "crypto";
 
 function isPlainObject3(value) {
   if (typeof value !== "object" || value === null) {
@@ -72887,14 +73278,14 @@ function createDockerClient(options = {}) {
 var InspectionError = class extends Error {
   name = "InspectionError";
 };
-function isRecord6(value) {
+function isRecord7(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function optionalString2(value) {
   return typeof value === "string" ? value : void 0;
 }
 function stringRecord(value) {
-  if (!isRecord6(value)) {
+  if (!isRecord7(value)) {
     return void 0;
   }
   const out = {};
@@ -72906,7 +73297,7 @@ function stringRecord(value) {
   return out;
 }
 function parsePackage(value) {
-  if (!isRecord6(value) || typeof value.dir !== "string") {
+  if (!isRecord7(value) || typeof value.dir !== "string") {
     throw new InspectionError("package entry is malformed");
   }
   if (value.dir.startsWith("/") || value.dir.split("/").includes("..")) {
@@ -72919,14 +73310,14 @@ function parsePackage(value) {
     private: typeof value.private === "boolean" ? value.private : void 0,
     scripts: stringRecord(value.scripts),
     packageManager: optionalString2(value.packageManager),
-    publishConfig: isRecord6(value.publishConfig) ? value.publishConfig : void 0,
+    publishConfig: isRecord7(value.publishConfig) ? value.publishConfig : void 0,
     engines: stringRecord(value.engines),
     hasWorkspaces: typeof value.hasWorkspaces === "boolean" ? value.hasWorkspaces : void 0,
     lockfiles: Array.isArray(value.lockfiles) ? value.lockfiles.filter((entry) => typeof entry === "string") : void 0
   };
 }
 function parseInspection(json2) {
-  if (!isRecord6(json2)) {
+  if (!isRecord7(json2)) {
     throw new InspectionError("inspection is not an object");
   }
   if (typeof json2.commit !== "string" || !/^[0-9a-f]{40}$/.test(json2.commit)) {
@@ -72935,7 +73326,7 @@ function parseInspection(json2) {
   if (!Array.isArray(json2.packages)) {
     throw new InspectionError("inspection has no packages list");
   }
-  const details = isRecord6(json2.lockfileDetails) ? json2.lockfileDetails : {};
+  const details = isRecord7(json2.lockfileDetails) ? json2.lockfileDetails : {};
   return {
     commit: json2.commit,
     lockfiles: Array.isArray(json2.lockfiles) ? json2.lockfiles.filter((entry) => typeof entry === "string") : [],
@@ -73600,7 +73991,7 @@ async function rebuildPackage(source, target, options = {}) {
     if (exported.exitCode !== 0) {
       return fail2(stageFailure("export", exported));
     }
-    const sha = createHash3("sha256").update(exported.stdout).digest("hex");
+    const sha = createHash4("sha256").update(exported.stdout).digest("hex");
     if (sha !== expectedSha) {
       return fail2(`exported tarball digest ${sha} does not match the build stage's ${expectedSha}`);
     }
@@ -73993,7 +74384,7 @@ var ENTRY_POINT_FIELDS = [
   "typings",
   "imports"
 ];
-function isRecord7(value) {
+function isRecord8(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function readManifest(tarball) {
@@ -74006,14 +74397,14 @@ function readManifest(tarball) {
   }
   try {
     const parsed = JSON.parse(entry.content.toString("utf8"));
-    return isRecord7(parsed) ? { ok: true, manifest: parsed } : { ok: false, problem: "package.json is not an object" };
+    return isRecord8(parsed) ? { ok: true, manifest: parsed } : { ok: false, problem: "package.json is not an object" };
   } catch {
     return { ok: false, problem: "package.json is not valid JSON" };
   }
 }
 function stringMap(value) {
   const out = {};
-  if (isRecord7(value)) {
+  if (isRecord8(value)) {
     for (const [key, entry] of Object.entries(value)) {
       if (typeof entry === "string") {
         out[key] = entry;
@@ -74031,7 +74422,7 @@ function stringMap(value) {
 function canonical(value) {
   return JSON.stringify(
     value,
-    (_key, entry) => isRecord7(entry) ? Object.fromEntries(Object.entries(entry).sort(([a2], [b2]) => a2.localeCompare(b2))) : entry
+    (_key, entry) => isRecord8(entry) ? Object.fromEntries(Object.entries(entry).sort(([a2], [b2]) => a2.localeCompare(b2))) : entry
   );
 }
 function same(a2, b2) {
@@ -74243,26 +74634,6 @@ function manifestRules(context4) {
   return findings;
 }
 
-// ../packages/core/src/rules/repository.ts
-function normalizeGithubRepository(value) {
-  if (!value) {
-    return void 0;
-  }
-  const text = value.trim().replace(/^git\+/, "");
-  const short = text.replace(/^github:/, "");
-  const shorthand = /^([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/.exec(short);
-  if (shorthand && !short.includes(":") && !short.includes("//")) {
-    return `https://github.com/${shorthand[1]}/${shorthand[2]}`.toLowerCase();
-  }
-  const url = /^(?:https?:\/\/|git:\/\/|ssh:\/\/(?:git@)?|git@)(?:www\.)?github\.com[/:]([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?(?:[#?].*)?$/.exec(
-    text
-  );
-  if (url) {
-    return `https://github.com/${url[1]}/${url[2]}`.toLowerCase();
-  }
-  return void 0;
-}
-
 // ../packages/core/src/rules/provenance.ts
 var USUAL_TRIGGERS = /* @__PURE__ */ new Set(["push", "release", "workflow_dispatch", "create", "schedule"]);
 function provenanceRules(context4) {
@@ -74378,7 +74749,7 @@ function provenanceRules(context4) {
         title: "the registry's publish attestation does not verify",
         detail: publish.problem ?? "unknown problem"
       });
-    } else if (publish.status === "missing") {
+    } else if (publish.status === "missing" && context4.origin !== "staged") {
       findings.push({
         id: "publish-attestation-missing",
         severity: "low",
@@ -74552,6 +74923,7 @@ var defaultDeps = {
   fetchStaged,
   fetchRegistryKeys,
   verifyProvenance,
+  findRekorProvenance,
   rebuildPackage
 };
 function rebuildReport(rebuild, durationMs) {
@@ -74601,6 +74973,34 @@ function chooseSource(provenance, options) {
   }
   return void 0;
 }
+async function provenanceFromRekor(artifact, provenance, options, deps, log) {
+  const withNotes = (notes) => ({
+    ...provenance,
+    warnings: [...provenance.warnings, ...notes]
+  });
+  if (!options.repository) {
+    return withNotes([
+      "pass --repo to look up the staged version's provenance in the Rekor transparency log"
+    ]);
+  }
+  log("looking up the provenance in the Rekor transparency log");
+  try {
+    const found = await deps.findRekorProvenance(
+      { purl: artifact.purl, sha512Hex: artifact.digests.sha512Hex },
+      {
+        expectedRepository: options.repository,
+        offline: options.offline,
+        tufCachePath: options.tufCachePath
+      }
+    );
+    return found.provenance ?? withNotes(found.notes);
+  } catch (error2) {
+    if (!(error2 instanceof ToolError)) {
+      throw error2;
+    }
+    return withNotes([`Rekor lookup failed: ${error2.message}`]);
+  }
+}
 async function runCheck(options, deps = defaultDeps) {
   const started = Date.now();
   const log = options.log ?? (() => {
@@ -74640,7 +75040,7 @@ async function runCheck(options, deps = defaultDeps) {
     log(`registry keys unavailable: ${error2.message}`);
   }
   log("verifying provenance");
-  const provenance = await deps.verifyProvenance(
+  let provenance = await deps.verifyProvenance(
     {
       purl: artifact.purl,
       sha512Hex: artifact.digests.sha512Hex,
@@ -74648,7 +75048,12 @@ async function runCheck(options, deps = defaultDeps) {
     },
     { registryKeys, offline: options.offline, tufCachePath: options.tufCachePath }
   );
-  log(`provenance: ${provenance.status}`);
+  if (artifact.origin.kind === "staged" && provenance.status === "missing" && options.rekor !== false) {
+    provenance = await provenanceFromRekor(artifact, provenance, options, deps, log);
+  }
+  log(
+    `provenance: ${provenance.status}${provenance.attestationSource === "rekor" ? " (from Rekor)" : ""}`
+  );
   const source = chooseSource(provenance, options);
   const release = readTarball(artifact.tarball);
   let rebuild;
@@ -74763,6 +75168,9 @@ function provenanceLines(report) {
     const log = transparencyLogLine(provenance.transparencyLog);
     if (log) {
       out += cont(log);
+    }
+    if (provenance.attestationSource === "rekor") {
+      out += cont("found in the Rekor transparency log; the registry hides it until approval");
     }
     return out;
   }

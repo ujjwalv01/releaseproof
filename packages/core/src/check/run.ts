@@ -5,6 +5,7 @@ import { fetchPublished } from "../fetch/published.js";
 import { fetchStaged } from "../fetch/staged.js";
 import type { ReleaseArtifact } from "../fetch/types.js";
 import { fetchRegistryKeys } from "../provenance/keys.js";
+import { findRekorProvenance } from "../provenance/rekor.js";
 import type { ProvenanceResult } from "../provenance/types.js";
 import { verifyProvenance } from "../provenance/verify.js";
 import {
@@ -34,6 +35,11 @@ export interface CheckOptions {
   buildCommand?: string | undefined;
   /** Use the cached Sigstore trust root without refreshing it. */
   offline?: boolean | undefined;
+  /**
+   * Look a staged version's provenance up in the Rekor transparency log by the tarball's
+   * SHA-512 (sent to Rekor). Needs `repository`. Defaults to true.
+   */
+  rekor?: boolean | undefined;
   tufCachePath?: string | undefined;
   keepVolume?: boolean | undefined;
   timeouts?: Partial<StageTimeouts> | undefined;
@@ -47,6 +53,7 @@ export interface CheckDeps {
   fetchStaged: typeof fetchStaged;
   fetchRegistryKeys: typeof fetchRegistryKeys;
   verifyProvenance: typeof verifyProvenance;
+  findRekorProvenance: typeof findRekorProvenance;
   rebuildPackage: typeof rebuildPackage;
 }
 
@@ -55,6 +62,7 @@ const defaultDeps: CheckDeps = {
   fetchStaged,
   fetchRegistryKeys,
   verifyProvenance,
+  findRekorProvenance,
   rebuildPackage,
 };
 
@@ -166,6 +174,46 @@ export function chooseSource(
 }
 
 /**
+ * npm hides a staged version's attestations until approval but has already written the
+ * provenance to Rekor. Looks it up there; anything short of a verified entry from the
+ * expected repository leaves the result as it was, with a note saying why.
+ */
+async function provenanceFromRekor(
+  artifact: ReleaseArtifact,
+  provenance: ProvenanceResult,
+  options: CheckOptions,
+  deps: CheckDeps,
+  log: (line: string) => void,
+): Promise<ProvenanceResult> {
+  const withNotes = (notes: string[]) => ({
+    ...provenance,
+    warnings: [...provenance.warnings, ...notes],
+  });
+  if (!options.repository) {
+    return withNotes([
+      "pass --repo to look up the staged version's provenance in the Rekor transparency log",
+    ]);
+  }
+  log("looking up the provenance in the Rekor transparency log");
+  try {
+    const found = await deps.findRekorProvenance(
+      { purl: artifact.purl, sha512Hex: artifact.digests.sha512Hex },
+      {
+        expectedRepository: options.repository,
+        offline: options.offline,
+        tufCachePath: options.tufCachePath,
+      },
+    );
+    return found.provenance ?? withNotes(found.notes);
+  } catch (error) {
+    if (!(error instanceof ToolError)) {
+      throw error;
+    }
+    return withNotes([`Rekor lookup failed: ${error.message}`]);
+  }
+}
+
+/**
  * The whole check: fetch, verify provenance, rebuild from the source, diff, decide.
  * Throws ToolError only for environment problems (registry unreachable, bad options,
  * Docker missing); everything about the package itself ends up in the verdict.
@@ -213,7 +261,7 @@ export async function runCheck(
     log(`registry keys unavailable: ${error.message}`);
   }
   log("verifying provenance");
-  const provenance = await deps.verifyProvenance(
+  let provenance = await deps.verifyProvenance(
     {
       purl: artifact.purl,
       sha512Hex: artifact.digests.sha512Hex,
@@ -221,7 +269,16 @@ export async function runCheck(
     },
     { registryKeys, offline: options.offline, tufCachePath: options.tufCachePath },
   );
-  log(`provenance: ${provenance.status}`);
+  if (
+    artifact.origin.kind === "staged" &&
+    provenance.status === "missing" &&
+    options.rekor !== false
+  ) {
+    provenance = await provenanceFromRekor(artifact, provenance, options, deps, log);
+  }
+  log(
+    `provenance: ${provenance.status}${provenance.attestationSource === "rekor" ? " (from Rekor)" : ""}`,
+  );
 
   const source = chooseSource(provenance, options);
   const release = readTarball(artifact.tarball);

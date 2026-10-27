@@ -12,6 +12,7 @@ export * from "./provenance/certificate.js";
 export * from "./provenance/der.js";
 export * from "./provenance/keys.js";
 export * from "./provenance/predicate.js";
+export * from "./provenance/rekor.js";
 export * from "./provenance/types.js";
 export * from "./provenance/verify.js";
 export * from "./rebuild/docker.js";

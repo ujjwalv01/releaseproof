@@ -28,6 +28,10 @@ export function createProgram(): Command {
     .option("--build-command <command>", "shell command to build with instead of the detected one")
     .option("--memory <size>", "Docker memory limit for the build containers (default: 4g)")
     .option("--offline", "use the cached Sigstore trust root without refreshing it")
+    .option(
+      "--no-rekor",
+      "skip looking up a staged version's provenance in the Rekor transparency log (the lookup sends Rekor the tarball's SHA-512)",
+    )
     .option("--keep-volume", "keep the Docker volume after the run, for debugging")
     .option("--json", "print the full report as JSON")
     .option("--quiet", "no progress output on stderr")

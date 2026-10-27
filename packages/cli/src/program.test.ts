@@ -21,4 +21,9 @@ describe("releaseproof CLI", () => {
     expect(output.trim()).toBe(pkg.version);
     expect(exitCode).toBe(0);
   });
+
+  it("documents --no-rekor in check --help", () => {
+    const check = createProgram().commands.find((command) => command.name() === "check");
+    expect(check?.helpInformation()).toContain("--no-rekor");
+  });
 });

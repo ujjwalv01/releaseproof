@@ -85,3 +85,30 @@ export function withEditedProvenance(
   envelope.payload = Buffer.from(JSON.stringify(statement)).toString("base64");
   return copy;
 }
+
+/**
+ * releaseproof@0.1.1: staged, checked, then approved. Its provenance was written to Rekor at
+ * stage time (logIndex 3310501741) and is the bundle the registry serves since approval.
+ */
+export const RELEASEPROOF_011 = {
+  purl: "pkg:npm/releaseproof@0.1.1",
+  sha512Hex:
+    "64380e5d43309eab590fcd26b085e5001f4807db83f1e2b5e0e9c79b784b156808a331c2e2c363e1ba5489290863f7adfe066319a46d3fac0da67cf38a747a3c",
+  commit: "a75606a8dd1c6369f2563b7b889848d9df8986bb",
+  repository: "https://github.com/ujjwalv01/releaseproof",
+  logIndex: 3310501741,
+  rekorUuid: "108e9186e8c5677a111b04dc48ca27af608ba149d59a4d58e23e5f054206bd18c5168a126dfa727f",
+} as const;
+
+export function releaseproofAttestations(): AttestationsResponse {
+  return readFixtureJson<AttestationsResponse>("releaseproof-0.1.1", "attestations.json");
+}
+
+/**
+ * `GET /api/v1/log/entries/{uuid}` for the provenance entry, in Rekor's API shape (hex log
+ * id and hashes, numbers for indexes). Written from the tlog entry of the registry's bundle,
+ * which sigstore-js built from this response when npm signed.
+ */
+export function releaseproofRekorEntry(): Record<string, Record<string, unknown>> {
+  return readFixtureJson("releaseproof-0.1.1", "rekor-entry.json");
+}
