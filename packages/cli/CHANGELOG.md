@@ -1,5 +1,17 @@
 # releaseproof
 
+## 0.2.1
+
+### Patch Changes
+
+- [#38](https://github.com/ujjwalv01/releaseproof/pull/38) [`2a345f8`](https://github.com/ujjwalv01/releaseproof/commit/2a345f8f46ba4f74a0c92ef5ab0ed9f634ac4f9b) Thanks [@ujjwalv01](https://github.com/ujjwalv01)! - `releaseproof check --help` lists the exit codes: 0 matches source, 1 differs from source, 2 could not verify or a tool error.
+
+- [#40](https://github.com/ujjwalv01/releaseproof/pull/40) [`0a38db9`](https://github.com/ujjwalv01/releaseproof/commit/0a38db9c77a961a30aacba3f33872574e2e4b650) Thanks [@ujjwalv01](https://github.com/ujjwalv01)! - On a Node.js older than 22.12 the CLI now stops with `releaseproof needs Node.js 22.12 or newer; you are running <version>` and exit code 2, instead of failing inside a dependency with a confusing error.
+
+- [`a5d3e3e`](https://github.com/ujjwalv01/releaseproof/commit/a5d3e3e9ca4ab0ce09bff11c0aa35938908d8b80) Thanks [@Vamsi-2581](https://github.com/Vamsi-2581)! - Show rebuild durations of one hour or longer as hours, minutes, and seconds in text reports.
+
+- [#39](https://github.com/ujjwalv01/releaseproof/pull/39) [`7cd629d`](https://github.com/ujjwalv01/releaseproof/commit/7cd629d5fe20b2047263169943ce2010b2d4a3e4) Thanks [@ujjwalv01](https://github.com/ujjwalv01)! - `releaseproof check --token` now prints a warning on stderr: a token on the command line ends up in shell history and process lists, so prefer `NPM_TOKEN` or `npm login`. `--quiet` suppresses it.
+
 ## 0.2.0
 
 ### Minor Changes
