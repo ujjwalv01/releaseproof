@@ -7,9 +7,6 @@
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-/** Open issues one contributor may hold at a time. */
-export const MAX_OPEN_CLAIMS = 3;
-
 const COMMAND_CLAIM = /^\s*[/.](?:assign|take)(?:\s+me)?\s*$/im;
 const COMMAND_RELEASE = /^\s*\/unassign(?:\s+me)?\s*$/im;
 
@@ -56,14 +53,7 @@ export function parseIntent(body) {
  * What to do, from the facts only. Returns { action, reply } where action is "assign",
  * "unassign" or "none", and reply is the comment to post (undefined for none).
  */
-export function decide({
-  intent,
-  login,
-  assignees,
-  openClaims = 0,
-  repository,
-  max = MAX_OPEN_CLAIMS,
-}) {
+export function decide({ intent, login, assignees, repository }) {
   const repo = `https://github.com/${repository}`;
   const mine = assignees.includes(login);
   if (intent === "release") {
@@ -83,15 +73,9 @@ export function decide({
       reply: `@${login} this issue is already assigned to ${assignees.map((a) => `@${a}`).join(", ")}. Have a look at the other [good first issues](${repo}/labels/good%20first%20issue), or comment here if the assignee has gone quiet.`,
     };
   }
-  if (openClaims >= max) {
-    return {
-      action: "none",
-      reply: `@${login} you already have ${openClaims} open issues assigned here, and one person can work on at most ${max} at a time. Please finish one, or comment \`/unassign\` on one you no longer need, then ask again here.`,
-    };
-  }
   return {
     action: "assign",
-    reply: `Assigned to @${login}. Please open a pull request when you are ready (see [CONTRIBUTING.md](${repo}/blob/main/CONTRIBUTING.md)), or comment \`/unassign\` if you can no longer work on it. You can work on up to ${max} issues at a time. If you find releaseproof useful, giving the [repository](${repo}) a ⭐ helps others find it. Thank you!`,
+    reply: `Assigned to @${login}. Please open a pull request when you are ready (see [CONTRIBUTING.md](${repo}/blob/main/CONTRIBUTING.md)), or comment \`/unassign\` if you can no longer work on it. If you find releaseproof useful, giving the [repository](${repo}) a ⭐ helps others find it. Thank you!`,
   };
 }
 
@@ -134,16 +118,7 @@ export async function run(event, api, log = console.log) {
   }
 
   const assignees = (issue.assignees ?? []).map((a) => a.login);
-  let openClaims = 0;
-  if (intent === "claim" && assignees.length === 0) {
-    const assigned = await api(
-      "GET",
-      `/issues?state=open&assignee=${encodeURIComponent(login)}&per_page=100`,
-    );
-    // The issues endpoint also lists pull requests; only issues count.
-    openClaims = assigned.filter((i) => !i.pull_request).length;
-  }
-  const { action, reply } = decide({ intent, login, assignees, openClaims, repository });
+  const { action, reply } = decide({ intent, login, assignees, repository });
   log(`${intent} by ${login} on #${issue.number}: ${action}`);
 
   let message = reply;

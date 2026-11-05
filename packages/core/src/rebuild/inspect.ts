@@ -68,8 +68,15 @@ function parsePackage(value: unknown): PackageInfo {
   if (!isRecord(value) || typeof value.dir !== "string") {
     throw new InspectionError("package entry is malformed");
   }
+  if (value.dir.includes("\0")) {
+    throw new InspectionError("package directory contains NUL");
+  }
   if (value.dir.startsWith("/") || value.dir.split("/").includes("..")) {
     throw new InspectionError(`package directory "${value.dir}" is not inside the repository`);
+  }
+  const publishConfig = isRecord(value.publishConfig) ? value.publishConfig : undefined;
+  if (typeof publishConfig?.directory === "string" && publishConfig.directory.includes("\0")) {
+    throw new InspectionError("publishConfig.directory contains NUL");
   }
   return {
     dir: value.dir,
@@ -78,7 +85,7 @@ function parsePackage(value: unknown): PackageInfo {
     private: typeof value.private === "boolean" ? value.private : undefined,
     scripts: stringRecord(value.scripts),
     packageManager: optionalString(value.packageManager),
-    publishConfig: isRecord(value.publishConfig) ? value.publishConfig : undefined,
+    publishConfig,
     engines: stringRecord(value.engines),
     hasWorkspaces: typeof value.hasWorkspaces === "boolean" ? value.hasWorkspaces : undefined,
     lockfiles: Array.isArray(value.lockfiles)

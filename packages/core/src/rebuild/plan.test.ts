@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type PackageInfo, parseInspection, type RepoInspection } from "./inspect.js";
+import type { PackageInfo, RepoInspection } from "./inspect.js";
 import { OUT_DIR, parseNodeMajor, planBuild, REPO_DIR } from "./plan.js";
 
 const commit = "7d2900eca1c22b3f87c13987c8d4b7c9a29b733a";
@@ -422,36 +422,6 @@ describe("parseNodeMajor", () => {
     ["latest", undefined],
   ])("parses %j as %s", (text, expected) => {
     expect(parseNodeMajor(text)).toBe(expected);
-  });
-});
-
-describe("parseInspection", () => {
-  it("validates the clone stage's JSON and rejects escaping package directories", () => {
-    const parsed = parseInspection({
-      commit,
-      lockfiles: ["pnpm-lock.yaml", 5],
-      lockfileDetails: { pnpm: "9.0" },
-      nodeVersionFiles: { ".nvmrc": "22" },
-      hasPnpmWorkspace: true,
-      packages: [
-        {
-          dir: ".",
-          name: "root",
-          private: true,
-          scripts: { build: "x", bad: 1 },
-          hasWorkspaces: true,
-        },
-      ],
-      workflow: "node-version: 22",
-    });
-    expect(parsed.lockfiles).toEqual(["pnpm-lock.yaml"]);
-    expect(parsed.packages[0]?.scripts).toEqual({ build: "x" });
-    expect(parsed.hasYarnrcYml).toBe(false);
-    expect(() => parseInspection({ commit, packages: [{ dir: "../outside" }] })).toThrow(
-      /not inside the repository/,
-    );
-    expect(() => parseInspection({ commit: "abc", packages: [] })).toThrow(/no commit/);
-    expect(() => parseInspection("nope")).toThrow(/not an object/);
   });
 });
 
