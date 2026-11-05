@@ -73169,6 +73169,14 @@ var {
 } = getIpcExport();
 
 // ../packages/core/src/rebuild/docker.ts
+function parseMemoryLimit(value, inputName = "--memory") {
+  const memory = value?.trim().toLowerCase();
+  if (!memory) return void 0;
+  if (!/^\d+[kmg]?$/.test(memory)) {
+    throw new ToolError(`${inputName} must be a Docker size such as 4g or 6144m, got "${memory}"`);
+  }
+  return memory;
+}
 function dockerRunArgs(spec) {
   const envArgs = Object.entries(spec.env).flatMap(([key, value]) => ["-e", `${key}=${value}`]);
   const capArgs = (spec.capAdd ?? []).flatMap((cap) => ["--cap-add", cap]);
@@ -75407,12 +75415,7 @@ function parseInputs(getInput2, context4) {
       `Input "node" must be a Node.js major version such as 22, got "${nodeInput}"`
     );
   }
-  const memoryInput = getInput2("memory").trim().toLowerCase();
-  if (memoryInput && !/^\d+[kmg]?$/.test(memoryInput)) {
-    throw new ToolError(
-      `Input "memory" must be a Docker size such as 4g or 6144m, got "${memoryInput}"`
-    );
-  }
+  const memoryInput = parseMemoryLimit(getInput2("memory"), 'Input "memory"');
   const failOnInput = getInput2("fail-on").trim() || "non-zero";
   if (!["non-zero", "differs", "never"].includes(failOnInput)) {
     throw new ToolError(`Input "fail-on" must be non-zero, differs or never, got "${failOnInput}"`);
@@ -75436,7 +75439,7 @@ function parseInputs(getInput2, context4) {
     nodeMajor,
     image: getInput2("image").trim() || void 0,
     buildCommand: getInput2("build-command").trim() || void 0,
-    memory: memoryInput || void 0,
+    memory: memoryInput,
     failOn: failOnInput,
     createIssue: createIssueInput === "true",
     issueLabels: getInput2("issue-labels").split(",").map((label) => label.trim()).filter((label) => label !== ""),

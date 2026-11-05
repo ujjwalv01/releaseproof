@@ -3,6 +3,7 @@ import {
   type CheckReport,
   ExitCode,
   formatReport,
+  parseMemoryLimit,
   runCheck,
   ToolError,
 } from "@releaseproof/core";
@@ -72,7 +73,7 @@ export async function runCheckCommand(
       image: options.image,
       nodeMajor: parseNodeMajor(options.node),
       buildCommand: options.buildCommand,
-      memory: options.memory,
+      memory: parseMemoryLimit(options.memory),
       offline: options.offline,
       rekor: options.rekor,
       keepVolume: options.keepVolume,

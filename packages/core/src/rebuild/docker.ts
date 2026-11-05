@@ -39,6 +39,19 @@ export interface DockerClient {
   run(spec: ContainerSpec): Promise<ContainerResult>;
 }
 
+/** Shared CLI/Action validation; an empty input leaves the rebuild default in effect. */
+export function parseMemoryLimit(
+  value: string | undefined,
+  inputName = "--memory",
+): string | undefined {
+  const memory = value?.trim().toLowerCase();
+  if (!memory) return undefined;
+  if (!/^\d+[kmg]?$/.test(memory)) {
+    throw new ToolError(`${inputName} must be a Docker size such as 4g or 6144m, got "${memory}"`);
+  }
+  return memory;
+}
+
 /**
  * The `docker run` argument list for a stage. Pure, so the hardening flags can be asserted
  * in tests: no capabilities, no privilege escalation, pid and memory limits, no host mounts

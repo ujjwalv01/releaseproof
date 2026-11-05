@@ -97,6 +97,37 @@ describe("runCheckCommand", () => {
   });
 });
 
+describe("runCheckCommand with --memory", () => {
+  it.each(["4gb", "four", "-1g", "4g --privileged", "4g; echo unsafe", "4g\0", "4\n2g"])(
+    "rejects %j before running a check",
+    async (memory) => {
+      const runCheck = vi.fn(async () => fakeReport(0));
+      const streams = io();
+      expect(await runCheckCommand("x@1.0.0", { memory }, streams.io, { runCheck })).toBe(2);
+      expect(runCheck).not.toHaveBeenCalled();
+      expect(streams.out).toEqual([]);
+      expect(streams.err).toEqual([
+        `error: --memory must be a Docker size such as 4g or 6144m, got "${memory}"\n`,
+      ]);
+    },
+  );
+
+  it.each([
+    ["4g", "4g"],
+    ["6144m", "6144m"],
+    ["512", "512"],
+    [" 6G ", "6g"],
+    ["", undefined],
+    ["   ", undefined],
+    [undefined, undefined],
+  ])("normalizes %j before running a check", async (memory, expected) => {
+    const runCheck = vi.fn(async (_options: CheckOptions) => fakeReport(0));
+    expect(await runCheckCommand("x@1.0.0", { memory }, io().io, { runCheck })).toBe(0);
+    expect(runCheck).toHaveBeenCalledOnce();
+    expect(runCheck.mock.calls[0]?.[0].memory).toBe(expected);
+  });
+});
+
 describe("runCheckCommand with --token", () => {
   const warning =
     "warning: --token is visible in shell history and process lists; prefer NPM_TOKEN or npm login\n";

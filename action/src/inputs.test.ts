@@ -131,4 +131,24 @@ describe("parseInputs memory", () => {
     expect(parseInputs(inputs({}), context()).memory).toBeUndefined();
     expect(() => parseInputs(inputs({ memory: "lots" }), context())).toThrow(/Docker size/);
   });
+
+  it.each([
+    ["4g", "4g"],
+    ["6144m", "6144m"],
+    ["512", "512"],
+    [" 6G ", "6g"],
+    ["", undefined],
+    ["   ", undefined],
+  ])("normalizes %j", (memory, expected) => {
+    expect(parseInputs(inputs({ memory }), context()).memory).toBe(expected);
+  });
+
+  it.each(["4gb", "four", "-1g", "4g --privileged", "4g; echo unsafe", "4g\0", "4\n2g"])(
+    "rejects %j with the existing input message",
+    (memory) => {
+      expect(() => parseInputs(inputs({ memory }), context())).toThrow(
+        new ToolError(`Input "memory" must be a Docker size such as 4g or 6144m, got "${memory}"`),
+      );
+    },
+  );
 });

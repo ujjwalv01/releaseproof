@@ -1,5 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { type ContainerSpec, dockerRunArgs } from "./docker.js";
+import { ToolError } from "../errors.js";
+import { type ContainerSpec, dockerRunArgs, parseMemoryLimit } from "./docker.js";
+
+describe("parseMemoryLimit", () => {
+  it.each([
+    ["4g", "4g"],
+    ["6144m", "6144m"],
+    ["512", "512"],
+    ["512K", "512k"],
+    [" 6G ", "6g"],
+    ["0", "0"],
+    ["", undefined],
+    ["   ", undefined],
+    [undefined, undefined],
+  ])("normalizes %j", (memory, expected) => {
+    expect(parseMemoryLimit(memory)).toBe(expected);
+  });
+
+  it.each(["4gb", "four", "-1g", "1.5g", "4g --privileged", "4g; echo unsafe", "4g\0", "4\n2g"])(
+    "rejects %j as a tool error",
+    (memory) => {
+      expect(() => parseMemoryLimit(memory)).toThrow(
+        new ToolError(`--memory must be a Docker size such as 4g or 6144m, got "${memory}"`),
+      );
+    },
+  );
+});
 
 const spec: ContainerSpec = {
   name: "releaseproof-abc-build",
