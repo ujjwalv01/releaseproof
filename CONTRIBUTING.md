@@ -52,9 +52,9 @@ Docker flags or the planner need a unit test and, when they affect real packages
   bigger and need Docker and some reading of `docs/design-rebuild.md`.
 - Claim an issue before starting so two people do not do the same work: comment `/assign`
   (or just "I'd like to work on this") on an open, unassigned issue and it is assigned to you
-  automatically. Comment `/unassign` to give it back. If you want to change something that
-  has no issue yet, open one first and describe the change; for anything security-relevant,
-  read SECURITY.md.
+  automatically. You can hold up to three open issues at a time; comment `/unassign` to give
+  one back. If you want to change something that has no issue yet, open one first and
+  describe the change; for anything security-relevant, read SECURITY.md.
 
 ## Pull requests, step by step
 
