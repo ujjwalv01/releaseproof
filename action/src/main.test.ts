@@ -148,7 +148,7 @@ describe("runAction", () => {
     expect(JSON.parse(io.files["releaseproof-report.json"] ?? "{}")).toMatchObject({
       verdict: { status: "differs-from-source" },
     });
-    expect(io.summaries[0]).toContain("## 🚨 DIFFERS FROM SOURCE — releaseproof@1.2.3");
+    expect(io.summaries[0]).toContain("## 🚨 DIFFERS FROM SOURCE — `releaseproof@1.2.3`");
     expect(io.failures).toEqual(["DIFFERS-FROM-SOURCE: because"]);
     expect(io.issues).toEqual([]);
   });

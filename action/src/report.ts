@@ -1,7 +1,31 @@
-import { type CheckReport, type Finding, sortFindings } from "@releaseproof/core";
+import { type CheckReport, type Finding, parseSpec, sortFindings } from "@releaseproof/core";
 
 /** GitHub truncates issue bodies above this; keep a margin for our own framing. */
 export const ISSUE_BODY_LIMIT = 60_000;
+
+/**
+ * The verdict summary is repeated in full inside the text report; above it, a long one
+ * (for example a list of unreadable archive entries) is cut to this many characters.
+ */
+export const SUMMARY_LIMIT = 1_000;
+
+/** Shown instead of a package name or version that is not well formed. */
+const UNNAMED_PACKAGE = "(package name not shown: the registry returned a malformed one)";
+
+/**
+ * `name@version` when both are a valid npm name and an exact version, so it is safe outside
+ * a code block. For a staged version they come from the registry's stage item, which is
+ * untrusted data, so anything else is replaced by a fixed note.
+ */
+function packageLabel(report: CheckReport): string | undefined {
+  const label = `${report.package.name}@${report.package.version}`;
+  try {
+    parseSpec(label);
+    return label;
+  } catch {
+    return undefined;
+  }
+}
 
 const HEADINGS = {
   "matches-source": "✅ MATCHES SOURCE",
@@ -39,8 +63,18 @@ export function fenceFor(text: string): string {
 }
 
 export function issueTitle(report: CheckReport): string {
-  const { name, version } = report.package;
-  return `releaseproof: ${name}@${version} ${HEADINGS[report.verdict.status].replace(/^\S+\s/, "")}`;
+  const verdict = HEADINGS[report.verdict.status].replace(/^\S+\s/, "");
+  return `releaseproof: ${packageLabel(report) ?? UNNAMED_PACKAGE} ${verdict}`;
+}
+
+/** The verdict summary in its own code block: it can quote archive paths and provenance text. */
+function summaryBlock(summary: string): string {
+  const text =
+    summary.length > SUMMARY_LIMIT
+      ? `${summary.slice(0, SUMMARY_LIMIT)}… (shortened; the full summary is in the report below)`
+      : summary;
+  const fence = fenceFor(text);
+  return `${fence}text\n${text}\n${fence}\n\n`;
 }
 
 /**
@@ -64,8 +98,10 @@ export function renderToolErrorMarkdown(
 }
 
 /**
- * Markdown for the job summary and the issue body. Everything that came from the package
- * or the build sits inside one code block.
+ * Markdown for the job summary and the issue body. Everything that came from the package,
+ * the registry or the build sits inside code blocks: the verdict summary in one, the text
+ * report in another. Outside them there is only our own text, the finding ids (fixed
+ * strings from the rules) and a package name that passed `parseSpec`.
  */
 export function renderMarkdown(
   report: CheckReport,
@@ -77,9 +113,9 @@ export function renderMarkdown(
   } = {},
 ): string {
   const maxChars = options.maxChars ?? ISSUE_BODY_LIMIT;
-  const { name, version } = report.package;
-  let body = `## ${HEADINGS[report.verdict.status]} — ${name}@${version}\n\n`;
-  body += `${report.verdict.summary}\n\n`;
+  const label = packageLabel(report);
+  let body = `## ${HEADINGS[report.verdict.status]} — ${label ? `\`${label}\`` : UNNAMED_PACKAGE}\n\n`;
+  body += summaryBlock(report.verdict.summary);
   const counts = report.verdict.counts;
   const countText = (["critical", "high", "medium", "low", "info"] as const)
     .filter((severity) => counts[severity] > 0)

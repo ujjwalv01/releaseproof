@@ -1,6 +1,6 @@
 import { type CheckReport, countBySeverity, type Finding } from "@releaseproof/core";
 import { describe, expect, it } from "vitest";
-import { fenceFor, ISSUE_BODY_LIMIT, issueTitle, renderMarkdown } from "./report.js";
+import { fenceFor, ISSUE_BODY_LIMIT, issueTitle, renderMarkdown, SUMMARY_LIMIT } from "./report.js";
 
 function report(status: CheckReport["verdict"]["status"], exitCode: 0 | 1 | 2): CheckReport {
   return {
@@ -56,6 +56,30 @@ function finding(id: string, severity: Finding["severity"]): Finding {
 
 const RULES_URL = "https://github.com/ujjwalv01/releaseproof/blob/main/docs/rules.md";
 
+/** The markdown with every fenced block removed: what GitHub renders as markdown. */
+function outsideFences(md: string): string {
+  const kept: string[] = [];
+  let fence: string | undefined;
+  for (const line of md.split("\n")) {
+    if (fence === undefined) {
+      const open = /^(`{3,})text$/.exec(line);
+      if (open) {
+        fence = open[1];
+      } else {
+        kept.push(line);
+      }
+    } else if (line === fence) {
+      fence = undefined;
+    }
+  }
+  expect(fence, "every fence must be closed").toBeUndefined();
+  return kept.join("\n");
+}
+
+/** Text a malicious archive could put into an entry path or link target. */
+const HOSTILE =
+  "```\n[click](https://evil.example) @someone ![](https://t.example/p.png) <img src=x>";
+
 describe("fenceFor", () => {
   it("is always longer than any backtick run in the content", () => {
     expect(fenceFor("plain")).toBe("```");
@@ -76,7 +100,7 @@ describe("renderMarkdown", () => {
     );
     expect(
       md.startsWith(
-        `## 🚨 DIFFERS FROM SOURCE — x@1.0.0\n\ndiffers-from-source summary\n\nFindings: 1 high\n\n- **high** [\`file-added\`](${RULES_URL})\n\n\`\`\`text\nreport text\n<img src=x onerror=alert(1)>\n\n\`\`\`\n`,
+        `## 🚨 DIFFERS FROM SOURCE — \`x@1.0.0\`\n\n\`\`\`text\ndiffers-from-source summary\n\`\`\`\n\nFindings: 1 high\n\n- **high** [\`file-added\`](${RULES_URL})\n\n\`\`\`text\nreport text\n<img src=x onerror=alert(1)>\n\n\`\`\`\n`,
       ),
     ).toBe(true);
     expect(md).toContain("Workflow run: https://github.com/o/r/actions/runs/1");
@@ -154,6 +178,58 @@ describe("renderMarkdown", () => {
     expect(prefix).not.toContain(untrusted);
     expect(prefix).not.toContain("@someone");
     expect(md).toContain(`\`\`\`\`text\n${untrusted}\n\`\`\`\``);
+  });
+
+  it("keeps a verdict summary quoting archive paths inside its own code block (#157)", () => {
+    const value = report("could-not-verify", 2);
+    value.verdict.summary = `COULD NOT VERIFY: the release tarball could not be read: symlink "${HOSTILE}" -> "${HOSTILE}"`;
+    const md = renderMarkdown(value, "report text");
+    const markdown = outsideFences(md);
+    for (const needle of ["evil.example", "@someone", "t.example", "<img"]) {
+      expect(markdown).not.toContain(needle);
+    }
+    expect(markdown).toContain("## ⚠️ COULD NOT VERIFY — `x@1.0.0`");
+    expect(markdown).toContain("Findings: 1 high");
+    expect(md).toContain(`\`\`\`\`text\n${value.verdict.summary}\n\`\`\`\``);
+  });
+
+  it("shortens a very long summary above the report and stays within the budget", () => {
+    const value = report("could-not-verify", 2);
+    value.verdict.summary = `${HOSTILE} ${"x".repeat(SUMMARY_LIMIT * 3)}`;
+    const md = renderMarkdown(value, "report text", { maxChars: 2_500 });
+    expect(md).toContain("… (shortened; the full summary is in the report below)");
+    expect(md.length).toBeLessThanOrEqual(2_500);
+    expect(outsideFences(md)).not.toContain("evil.example");
+  });
+
+  it.each([
+    ["[click](https://evil.example)", "1.0.0"],
+    ["@someone", "1.0.0"],
+    ["x", "1.0.0 ![](https://t.example/p.png)"],
+    ["x`y", "1.0.0"],
+  ])("replaces a malformed package name or version %j@%j from the registry", (name, version) => {
+    const value = report("differs-from-source", 1);
+    value.package = { ...value.package, origin: "staged", name, version };
+    const md = renderMarkdown(value, "report text");
+    const markdown = outsideFences(md);
+    expect(markdown).toContain(
+      "## 🚨 DIFFERS FROM SOURCE — (package name not shown: the registry returned a malformed one)",
+    );
+    for (const needle of ["evil.example", "@someone", "t.example", "x`y"]) {
+      expect(markdown).not.toContain(needle);
+    }
+    expect(issueTitle(value)).toBe(
+      "releaseproof: (package name not shown: the registry returned a malformed one) DIFFERS FROM SOURCE",
+    );
+  });
+
+  it("shows a valid scoped package name as inline code", () => {
+    const value = report("matches-source", 0);
+    value.package = { ...value.package, name: "@scope/pkg_name", version: "2.0.0-rc.1" };
+    expect(renderMarkdown(value, "ok")).toContain(
+      "## ✅ MATCHES SOURCE — `@scope/pkg_name@2.0.0-rc.1`\n",
+    );
+    expect(issueTitle(value)).toBe("releaseproof: @scope/pkg_name@2.0.0-rc.1 MATCHES SOURCE");
   });
 
   it("includes the finding list in a custom text truncation budget", () => {

@@ -75499,6 +75499,17 @@ function parseInputs(getInput2, context4) {
 
 // src/report.ts
 var ISSUE_BODY_LIMIT = 6e4;
+var SUMMARY_LIMIT = 1e3;
+var UNNAMED_PACKAGE = "(package name not shown: the registry returned a malformed one)";
+function packageLabel(report) {
+  const label = `${report.package.name}@${report.package.version}`;
+  try {
+    parseSpec(label);
+    return label;
+  } catch {
+    return void 0;
+  }
+}
 var HEADINGS = {
   "matches-source": "\u2705 MATCHES SOURCE",
   "differs-from-source": "\u{1F6A8} DIFFERS FROM SOURCE",
@@ -75527,8 +75538,17 @@ function fenceFor(text) {
   return "`".repeat(Math.max(3, longest + 1));
 }
 function issueTitle(report) {
-  const { name, version } = report.package;
-  return `releaseproof: ${name}@${version} ${HEADINGS[report.verdict.status].replace(/^\S+\s/, "")}`;
+  const verdict = HEADINGS[report.verdict.status].replace(/^\S+\s/, "");
+  return `releaseproof: ${packageLabel(report) ?? UNNAMED_PACKAGE} ${verdict}`;
+}
+function summaryBlock(summary2) {
+  const text = summary2.length > SUMMARY_LIMIT ? `${summary2.slice(0, SUMMARY_LIMIT)}\u2026 (shortened; the full summary is in the report below)` : summary2;
+  const fence = fenceFor(text);
+  return `${fence}text
+${text}
+${fence}
+
+`;
 }
 function renderToolErrorMarkdown(message, options = {}) {
   const body = `## ${HEADINGS["could-not-verify"]} \u2014 the check itself failed
@@ -75548,13 +75568,11 @@ ${footer}
 }
 function renderMarkdown(report, textReport, options = {}) {
   const maxChars = options.maxChars ?? ISSUE_BODY_LIMIT;
-  const { name, version } = report.package;
-  let body = `## ${HEADINGS[report.verdict.status]} \u2014 ${name}@${version}
+  const label = packageLabel(report);
+  let body = `## ${HEADINGS[report.verdict.status]} \u2014 ${label ? `\`${label}\`` : UNNAMED_PACKAGE}
 
 `;
-  body += `${report.verdict.summary}
-
-`;
+  body += summaryBlock(report.verdict.summary);
   const counts = report.verdict.counts;
   const countText = ["critical", "high", "medium", "low", "info"].filter((severity) => counts[severity] > 0).map((severity) => `${counts[severity]} ${severity}`).join(", ");
   body += `Findings: ${report.verdict.findings.length === 0 ? "none" : countText}
