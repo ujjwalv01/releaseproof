@@ -59,6 +59,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Changesets uses the main branch as its base for status checks.
+          fetch-depth: 0
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -72,6 +74,10 @@ jobs:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
 
       - run: pnpm install --frozen-lockfile
+      # Reject invalid front matter and unknown workspace packages before merging;
+      # PRs without a changeset (docs, tests, CI) are still allowed.
+      - name: Validate changesets
+        run: pnpm changeset status
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm build
