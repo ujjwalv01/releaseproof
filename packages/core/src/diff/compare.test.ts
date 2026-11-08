@@ -53,6 +53,18 @@ describe("compareTarballs", () => {
     expect(change?.release.text).toBe(true);
   });
 
+  it("catches an added prepare script as the only content change", async () => {
+    const result = await compareFixtures("attacked-lifecycle-script", "clean");
+    expect(result.matches).toBe(false);
+    expect(result.onlyInRelease).toEqual([]);
+    expect(result.onlyInRebuild).toEqual([]);
+    expect(result.changed.map((change) => [change.path, change.kind])).toEqual([
+      ["package.json", "content"],
+    ]);
+    expect(result.changed[0]?.patch).toContain('+    "prepare":');
+    expect(result.identical).toEqual(["LICENSE", "README.md", "index.js", "lib/greet.js"]);
+  });
+
   it("catches a file that is not in the source", async () => {
     const result = await compareFixtures("attacked-extra-file", "clean");
     expect(result.matches).toBe(false);

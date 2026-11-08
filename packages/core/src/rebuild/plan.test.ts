@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ToolError } from "../errors.js";
 import type { PackageInfo, RepoInspection } from "./inspect.js";
 import { OUT_DIR, parseNodeMajor, planBuild, REPO_DIR } from "./plan.js";
 
@@ -34,6 +35,55 @@ function plan(insp: RepoInspection, target = { name: "tiny", version: "1.0.0" },
   }
   return result.plan;
 }
+
+describe("planBuild: image override", () => {
+  it.each([
+    "node",
+    "node:22-bookworm",
+    "team/node:Tag_22",
+    `node:${"x".repeat(128)}`,
+    "registry.example.com:5000/team/node:22",
+    "localhost:5000/team/nested/node:22",
+    "ghcr.io/team/node",
+    "team/node-alpine_22.1",
+    `node@sha256:${"ab".repeat(32)}`,
+    `node:22@sha256:${"ab".repeat(32)}`,
+    `registry.example.com:5000/team/node:22@sha256:${"ab".repeat(32)}`,
+  ])("keeps the valid image reference %j", (image) => {
+    expect(plan(inspection({ packages: [single] }), undefined, { image }).image).toBe(image);
+  });
+
+  it.each([
+    "",
+    "--privileged",
+    "-v",
+    ":22",
+    "node:",
+    `node:${"x".repeat(129)}`,
+    "node:22@sha256:",
+    "registry.example.com:5000/",
+    "node:22 --privileged",
+    " node:22",
+    "node:22 ",
+    "node:22\n",
+    "node:22\r",
+    "node:22\t",
+    "node\0",
+    "node\x7f",
+    "team//node",
+    "node:22;echo",
+    "node@",
+    `node@sha256:${"a".repeat(63)}`,
+    `node@sha256:${"a".repeat(65)}`,
+    `node@sha256:${"g".repeat(64)}`,
+  ])("rejects malformed image reference %j as a tool error", (image) => {
+    expect(() => plan(inspection({ packages: [single] }), undefined, { image })).toThrow(
+      new ToolError(
+        `--image must be a Docker image reference such as node:22-bookworm, got ${JSON.stringify(image)}`,
+      ),
+    );
+  });
+});
 
 describe("planBuild: package selection", () => {
   it("fails when the package is not in the repository", () => {

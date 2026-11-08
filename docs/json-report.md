@@ -222,3 +222,14 @@ npx releaseproof check sigstore@5.0.0 --json > report.json
 jq -r '.verdict.status' report.json
 jq -r '.verdict.findings[] | select(.severity == "critical" or .severity == "high") | .id' report.json
 ```
+
+## When the check cannot run
+
+A `ToolError` (Docker missing, registry unreachable, a bad option) prints `error: …` on
+stderr, exits with code 2, and — with `--json` — writes one object to stdout:
+
+```json
+{ "error": { "message": "Docker is not available" } }
+```
+
+A consumer can tell it apart from a report by the `error` key: reports never have one.

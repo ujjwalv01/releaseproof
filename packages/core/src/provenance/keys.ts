@@ -25,6 +25,16 @@ export function readRegistryKeys(body: unknown): RegistryKey[] | null {
     if (!isRecord(entry) || typeof entry.keyid !== "string" || typeof entry.key !== "string") {
       return null;
     }
+    // Only an absent or null expiry means "never expires". Any other value must be a date
+    // string that parses; a number, boolean, object or unparseable string rejects the list.
+    const { expires } = entry;
+    if (
+      expires !== undefined &&
+      expires !== null &&
+      (typeof expires !== "string" || !Number.isFinite(Date.parse(expires)))
+    ) {
+      return null;
+    }
     keys.push({
       keyid: entry.keyid,
       key: entry.key,

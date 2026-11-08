@@ -6,6 +6,7 @@ import {
   parseMemoryLimit,
   runCheck,
   ToolError,
+  validateImageReference,
 } from "@releaseproof/core";
 
 export interface CheckCommandOptions {
@@ -70,7 +71,7 @@ export async function runCheckCommand(
       token: options.token,
       repository: options.repo,
       commit: options.commit,
-      image: options.image,
+      image: options.image === undefined ? undefined : validateImageReference(options.image),
       nodeMajor: parseNodeMajor(options.node),
       buildCommand: options.buildCommand,
       memory: parseMemoryLimit(options.memory),
@@ -84,6 +85,11 @@ export async function runCheckCommand(
   } catch (error) {
     if (error instanceof ToolError) {
       io.stderr(`error: ${error.message}\n`);
+      if (options.json) {
+        // A script piping stdout to jq still gets one JSON object; the `error` key
+        // tells it apart from a report. See docs/json-report.md.
+        io.stdout(`${JSON.stringify({ error: { message: error.message } }, null, 2)}\n`);
+      }
       return ExitCode.ToolError;
     }
     throw error;

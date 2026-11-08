@@ -24,6 +24,11 @@ const UNEXPECTED_PATHS: Array<{ pattern: RegExp; why: string }> = [
     why: "config files that can carry credentials or change how tools behave",
   },
   { pattern: /^\.husky\//, why: "git hooks run commands" },
+  {
+    pattern:
+      /\.(pem|key|p12|pfx)$|(^|\/)(id_rsa|\.git-credentials|\.netrc)$|(^|\/)\.(ssh|aws|kube)\/|(^|\/)\.docker\/config\.json$/i,
+    why: "private keys and credential files must never ship in a package",
+  },
 ];
 
 const NATIVE_PATTERNS = /(^|\/)binding\.gyp$|\.(node|so|dll|dylib|exe|a|lib)$/i;

@@ -4,6 +4,7 @@ import { readTarball } from "../diff/tarball.js";
 import { fetchPublished } from "../fetch/published.js";
 import { fetchRegistryKeys } from "../provenance/keys.js";
 import { verifyProvenance } from "../provenance/verify.js";
+import { registryJson } from "../registry/client.js";
 import { rebuildPackage } from "./run.js";
 import { sourceFromProvenance } from "./source.js";
 
@@ -75,6 +76,34 @@ describe.skipIf(!process.env.RELEASEPROOF_DOCKER_TESTS)("rebuildPackage (docker)
     "rebuilds sigstore@5.0.0 (npm workspaces, tsc build) and it matches the release",
     async () => {
       const { diff } = await rebuildAndCompare("sigstore@5.0.0");
+      expect(diff.problems).toEqual({ release: [], rebuild: [] });
+      expect(diff.matches).toBe(true);
+    },
+    30 * 60_000,
+  );
+  it(
+    "rebuilds the latest published releaseproof release and it matches the release",
+    async () => {
+      const metadata = await registryJson<unknown>("/releaseproof");
+      const distTags =
+        typeof metadata === "object" && metadata !== null && "dist-tags" in metadata
+          ? metadata["dist-tags"]
+          : null;
+      if (
+        typeof distTags !== "object" ||
+        distTags === null ||
+        !("latest" in distTags) ||
+        typeof distTags.latest !== "string" ||
+        distTags.latest.length === 0
+      ) {
+        throw new Error("npm registry did not provide releaseproof's dist-tags.latest");
+      }
+
+      const version = distTags.latest;
+      const spec = `releaseproof@${version}`;
+      console.log(`[releaseproof] dist-tags.latest resolves to ${version}`);
+
+      const { diff } = await rebuildAndCompare(spec);
       expect(diff.problems).toEqual({ release: [], rebuild: [] });
       expect(diff.matches).toBe(true);
     },

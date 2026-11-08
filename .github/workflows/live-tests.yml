@@ -41,3 +41,26 @@ jobs:
         run: pnpm vitest run packages/core/src/rebuild/run.docker.test.ts
         env:
           RELEASEPROOF_DOCKER_TESTS: "1"
+
+  report-failure:
+    name: Report scheduled live test failures
+    runs-on: ubuntu-latest
+    needs: live
+    if: failure() && github.event_name == 'schedule'
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          issue_number="$(gh issue list --state open --search 'in:title "Live tests failing"' --limit 100 --json number,title --jq '[.[] | select(.title == "Live tests failing")][0].number // empty')"
+          body="$(printf 'The scheduled live tests failed.\n\nRun: %s/%s/actions/runs/%s' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+
+          if [ -n "$issue_number" ]; then
+            gh issue comment "$issue_number" --body "$body"
+          else
+            gh issue create --title "Live tests failing" --body "$body"
+          fi

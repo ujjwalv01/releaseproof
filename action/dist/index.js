@@ -64247,6 +64247,12 @@ async function request2(path13, accept, options) {
   const url = registryUrl(options.registry, path13);
   const headers = { accept, "user-agent": "releaseproof" };
   if (options.token) {
+    const target = new URL(url);
+    if (target.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(target.hostname)) {
+      throw new ToolError(
+        "Refusing to send a registry token over unencrypted HTTP to a non-loopback host; use an https:// registry URL."
+      );
+    }
     headers.authorization = `Bearer ${options.token}`;
   }
   const doFetch = options.fetch ?? fetch;
@@ -64374,6 +64380,11 @@ var VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 function parseSpec(input) {
   const at2 = input.lastIndexOf("@");
   if (at2 <= 0) {
+    if (input.length <= 214 && NAME_RE.test(input)) {
+      throw new ToolError(
+        `Give an exact version: ${input}@<version>, for example ${input}@1.2.3 (npm view ${input} version prints the latest)`
+      );
+    }
     throw new ToolError(`Expected <name>@<version>, got "${input}"`);
   }
   const name = input.slice(0, at2);
@@ -64631,6 +64642,10 @@ function readRegistryKeys(body) {
   const keys = [];
   for (const entry of body.keys) {
     if (!isRecord3(entry) || typeof entry.keyid !== "string" || typeof entry.key !== "string") {
+      return null;
+    }
+    const { expires } = entry;
+    if (expires !== void 0 && expires !== null && (typeof expires !== "string" || !Number.isFinite(Date.parse(expires)))) {
       return null;
     }
     keys.push({
@@ -73226,14 +73241,36 @@ function createDockerClient(options = {}) {
       try {
         return (await docker(["version", "--format", "{{.Server.Version}}"], 3e4)).trim();
       } catch (error2) {
-        throw new ToolError(
-          `Docker is not available (is Docker Desktop running?): ${errorMessage(error2)}`,
-          { cause: error2 }
-        );
+        const detail = errorMessage(error2);
+        let advice = "Docker is not available (is Docker Desktop running?)";
+        if (/\bENOENT\b|not recognized as an internal or external command/i.test(detail)) {
+          advice = "docker was not found on PATH: install Docker (https://docs.docker.com/get-docker/), or open a new terminal if you just installed it";
+        } else if (/cannot connect to the docker daemon|dockerDesktopLinuxEngine|error during connect/i.test(
+          detail
+        )) {
+          advice = "Docker is installed but not running: start Docker Desktop (or the docker service) and try again";
+        }
+        throw new ToolError(`${advice}: ${detail}`, { cause: error2 });
       }
     },
     async pull(image) {
-      await docker(["pull", "--quiet", image], 15 * 6e4);
+      try {
+        await docker(["pull", "--quiet", image], 15 * 6e4);
+      } catch (error2) {
+        const detail = errorMessage(error2);
+        const escapedImage = image.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const imageNotFound = new RegExp(
+          String.raw`(?:^|:\s+)(?:image\s+)?["']?(?:[\w.:-]+/)*${escapedImage}["']?:?\s+not found(?:$|:)`,
+          "im"
+        );
+        if (error2 instanceof ToolError && (/\bmanifest (?:unknown\b|for \S+ not found(?:$|:))/im.test(detail) || imageNotFound.test(detail))) {
+          throw new ToolError(
+            `image ${JSON.stringify(image)} does not exist; pick a supported Node major with --node, or name an image with --image`,
+            { cause: error2 }
+          );
+        }
+        throw error2;
+      }
     },
     async imageDigest(image) {
       try {
@@ -73364,6 +73401,18 @@ function parseInspection(json2) {
 var REPO_DIR = "/work/repo";
 var OUT_DIR = "/work/out";
 var DEFAULT_NODE_MAJOR = 22;
+var IMAGE_PATH_COMPONENT = "[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*";
+var IMAGE_REFERENCE_RE = new RegExp(
+  `^(?:[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]+)?/)?${IMAGE_PATH_COMPONENT}(?:/${IMAGE_PATH_COMPONENT})*(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?(?:@sha256:[a-fA-F0-9]{64})?$`
+);
+function validateImageReference(image, inputName = "--image") {
+  if (/\s/.test(image) || !IMAGE_REFERENCE_RE.test(image)) {
+    throw new ToolError(
+      `${inputName} must be a Docker image reference such as node:22-bookworm, got ${JSON.stringify(image)}`
+    );
+  }
+  return image;
+}
 var PACK_TIME_SCRIPTS = [
   "prepack",
   "prepare",
@@ -73501,6 +73550,7 @@ function managerArgv(manager, ...args) {
 function planBuild(input) {
   const { inspection, target } = input;
   const overrides = input.overrides ?? {};
+  if (overrides.image !== void 0) validateImageReference(overrides.image);
   const warnings = [];
   const candidates = inspection.packages.filter((pkg2) => pkg2.name === target.name);
   if (candidates.length === 0) {
@@ -73829,6 +73879,7 @@ function textTail(result, includeStdout) {
   return tail(parts.filter((part) => part.trim() !== "").join("\n"));
 }
 async function rebuildPackage(source, target, options = {}) {
+  if (options.overrides?.image !== void 0) validateImageReference(options.overrides.image);
   const docker = options.docker ?? createDockerClient();
   const timeouts = { ...DEFAULT_TIMEOUTS, ...options.timeouts };
   const memory = options.memory ?? "4g";
@@ -74171,7 +74222,11 @@ var UNEXPECTED_PATHS = [
     pattern: /^\.(env|npmrc|yarnrc|yarnrc\.yml)$/,
     why: "config files that can carry credentials or change how tools behave"
   },
-  { pattern: /^\.husky\//, why: "git hooks run commands" }
+  { pattern: /^\.husky\//, why: "git hooks run commands" },
+  {
+    pattern: /\.(pem|key|p12|pfx)$|(^|\/)(id_rsa|\.git-credentials|\.netrc)$|(^|\/)\.(ssh|aws|kube)\/|(^|\/)\.docker\/config\.json$/i,
+    why: "private keys and credential files must never ship in a package"
+  }
 ];
 var NATIVE_PATTERNS = /(^|\/)binding\.gyp$|\.(node|so|dll|dylib|exe|a|lib)$/i;
 var ASSET_EXTENSIONS = /* @__PURE__ */ new Set([
@@ -75038,6 +75093,11 @@ async function provenanceFromRekor(artifact, provenance, options, deps, log) {
   }
 }
 async function runCheck(options, deps = defaultDeps) {
+  if (options.repository !== void 0 && normalizeGithubRepository(options.repository) === void 0) {
+    throw new ToolError(
+      `--repo must be a GitHub repository such as https://github.com/owner/repo or owner/repo, got "${options.repository}"`
+    );
+  }
   const started = Date.now();
   const log = options.log ?? (() => {
   });
@@ -75416,6 +75476,7 @@ function parseInputs(getInput2, context4) {
     );
   }
   const memoryInput = parseMemoryLimit(getInput2("memory"), 'Input "memory"');
+  const imageInput = getInput2("image");
   const failOnInput = getInput2("fail-on").trim() || "non-zero";
   if (!["non-zero", "differs", "never"].includes(failOnInput)) {
     throw new ToolError(`Input "fail-on" must be non-zero, differs or never, got "${failOnInput}"`);
@@ -75437,7 +75498,7 @@ function parseInputs(getInput2, context4) {
     commit: commitInput || void 0,
     registry: getInput2("registry").trim() || void 0,
     nodeMajor,
-    image: getInput2("image").trim() || void 0,
+    image: imageInput === "" ? void 0 : validateImageReference(imageInput, 'Input "image"'),
     buildCommand: getInput2("build-command").trim() || void 0,
     memory: memoryInput,
     failOn: failOnInput,
@@ -75450,11 +75511,37 @@ function parseInputs(getInput2, context4) {
 
 // src/report.ts
 var ISSUE_BODY_LIMIT = 6e4;
+var SUMMARY_LIMIT = 1e3;
+var UNNAMED_PACKAGE = "(package name not shown: the registry returned a malformed one)";
+function packageLabel(report) {
+  const label = `${report.package.name}@${report.package.version}`;
+  try {
+    parseSpec(label);
+    return label;
+  } catch {
+    return void 0;
+  }
+}
 var HEADINGS = {
   "matches-source": "\u2705 MATCHES SOURCE",
   "differs-from-source": "\u{1F6A8} DIFFERS FROM SOURCE",
   "could-not-verify": "\u26A0\uFE0F COULD NOT VERIFY"
 };
+function findingBullets(findings) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const { id, severity } of sortFindings(findings)) {
+    const group = groups.get(id);
+    if (group) {
+      group.count += 1;
+    } else {
+      groups.set(id, { severity, count: 1 });
+    }
+  }
+  return [...groups].map(
+    ([id, { severity, count: count3 }]) => `- **${severity}** [\`${id}\`](https://github.com/ujjwalv01/releaseproof/blob/main/docs/rules.md)${count3 > 1 ? ` (${count3})` : ""}
+`
+  );
+}
 function fenceFor(text) {
   let longest = 0;
   for (const run of text.match(/`+/g) ?? []) {
@@ -75463,18 +75550,41 @@ function fenceFor(text) {
   return "`".repeat(Math.max(3, longest + 1));
 }
 function issueTitle(report) {
-  const { name, version } = report.package;
-  return `releaseproof: ${name}@${version} ${HEADINGS[report.verdict.status].replace(/^\S+\s/, "")}`;
+  const verdict = HEADINGS[report.verdict.status].replace(/^\S+\s/, "");
+  return `releaseproof: ${packageLabel(report) ?? UNNAMED_PACKAGE} ${verdict}`;
+}
+function summaryBlock(summary2) {
+  const text = summary2.length > SUMMARY_LIMIT ? `${summary2.slice(0, SUMMARY_LIMIT)}\u2026 (shortened; the full summary is in the report below)` : summary2;
+  const fence = fenceFor(text);
+  return `${fence}text
+${text}
+${fence}
+
+`;
+}
+function renderToolErrorMarkdown(message, options = {}) {
+  const body = `## ${HEADINGS["could-not-verify"]} \u2014 the check itself failed
+
+`;
+  const footer = [
+    options.runUrl ? `Workflow run: ${options.runUrl}` : "",
+    'Generated by releaseproof. "Could not verify" is never "safe".'
+  ].filter((line) => line !== "").join("\n");
+  const fence = fenceFor(message);
+  return `${body}${fence}text
+${message}
+${fence}
+
+${footer}
+`;
 }
 function renderMarkdown(report, textReport, options = {}) {
   const maxChars = options.maxChars ?? ISSUE_BODY_LIMIT;
-  const { name, version } = report.package;
-  let body = `## ${HEADINGS[report.verdict.status]} \u2014 ${name}@${version}
+  const label = packageLabel(report);
+  let body = `## ${HEADINGS[report.verdict.status]} \u2014 ${label ? `\`${label}\`` : UNNAMED_PACKAGE}
 
 `;
-  body += `${report.verdict.summary}
-
-`;
+  body += summaryBlock(report.verdict.summary);
   const counts = report.verdict.counts;
   const countText = ["critical", "high", "medium", "low", "info"].filter((severity) => counts[severity] > 0).map((severity) => `${counts[severity]} ${severity}`).join(", ");
   body += `Findings: ${report.verdict.findings.length === 0 ? "none" : countText}
@@ -75493,6 +75603,28 @@ ${fence}
 
 ${footer}
 `;
+  const list = findingBullets(report.verdict.findings);
+  if (list.length > 0) {
+    const available = maxChars - body.length - frame.length - close.length - 80;
+    const fullList = `${list.join("")}
+`;
+    if (fullList.length <= available) {
+      body += fullList;
+    } else {
+      const notice = "\u2026 finding list truncated; the JSON report has everything\n\n";
+      let used = notice.length;
+      for (const bullet of list) {
+        if (used + bullet.length > available) {
+          break;
+        }
+        body += bullet;
+        used += bullet.length;
+      }
+      if (used <= available) {
+        body += notice;
+      }
+    }
+  }
   const budget = maxChars - body.length - frame.length - close.length - 80;
   let text = textReport;
   if (text.length > budget) {
@@ -75540,6 +75672,27 @@ async function runAction(io2) {
     });
   } catch (error2) {
     if (error2 instanceof ToolError) {
+      io2.setOutput("verdict", "could-not-verify");
+      io2.setOutput("exit-code", String(ExitCode2.ToolError));
+      io2.setOutput("summary", error2.message);
+      const markdown2 = renderToolErrorMarkdown(error2.message, { runUrl: io2.context.runUrl });
+      await io2.writeSummary(markdown2);
+      if (inputs.createIssue) {
+        try {
+          const url = await io2.createIssue({
+            token: inputs.token,
+            title: "releaseproof: could not verify",
+            body: markdown2,
+            labels: inputs.issueLabels
+          });
+          io2.setOutput("issue-url", url);
+          io2.info(`opened ${url}`);
+        } catch (issueError) {
+          io2.warning(
+            `could not open an issue (does the job have "issues: write"?): ${issueError instanceof Error ? issueError.message : String(issueError)}`
+          );
+        }
+      }
       io2.setFailed(`could not verify: ${error2.message}`);
       return;
     }
@@ -75583,7 +75736,7 @@ async function runAction(io2) {
 var workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
 var { context: context3 } = github_exports;
 await runAction({
-  getInput: (name) => getInput(name),
+  getInput: (name) => getInput(name, { trimWhitespace: name !== "image" }),
   context: {
     eventName: context3.eventName,
     repository: `${context3.repo.owner}/${context3.repo.repo}`,

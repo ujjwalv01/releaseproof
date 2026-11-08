@@ -170,6 +170,36 @@ describe("runCheck", () => {
     expect(report.verdict.findings[0]?.id).toBe("provenance-repository-unexpected");
   });
 
+  it("rejects a malformed --repo before fetching anything", async () => {
+    const deps = depsFor({ release: "clean" });
+    let fetched = false;
+    const fetchPublished = deps.fetchPublished;
+    deps.fetchPublished = async (spec, options) => {
+      fetched = true;
+      return fetchPublished(spec, options);
+    };
+    for (const repo of ["nope", "github.com/o/r"]) {
+      await expect(
+        runCheck({ spec: "@releaseproof/fixture@1.0.0", repository: repo }, deps),
+      ).rejects.toThrow(
+        `--repo must be a GitHub repository such as https://github.com/owner/repo or owner/repo, got "${repo}"`,
+      );
+    }
+    expect(fetched).toBe(false);
+  });
+
+  it.each([
+    "https://github.com/ujjwalv01/releaseproof",
+    "ujjwalv01/releaseproof",
+    "git+https://github.com/ujjwalv01/releaseproof.git",
+  ])("accepts --repo %j and still matches a clean release", async (repository) => {
+    const report = await runCheck(
+      { spec: "@releaseproof/fixture@1.0.0", repository },
+      depsFor({ release: "clean" }),
+    );
+    expect(report.verdict.status).toBe("matches-source");
+  });
+
   it("reports a failed rebuild as could-not-verify with the failure", async () => {
     const deps = depsFor({
       release: "clean",

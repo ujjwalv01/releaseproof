@@ -9,7 +9,7 @@ const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
 const { context } = github;
 
 await runAction({
-  getInput: (name) => core.getInput(name),
+  getInput: (name) => core.getInput(name, { trimWhitespace: name !== "image" }),
   context: {
     eventName: context.eventName,
     repository: `${context.repo.owner}/${context.repo.repo}`,

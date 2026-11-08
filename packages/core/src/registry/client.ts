@@ -51,6 +51,15 @@ async function request(path: string, accept: string, options: RegistryOptions): 
   const url = registryUrl(options.registry, path);
   const headers: Record<string, string> = { accept, "user-agent": "releaseproof" };
   if (options.token) {
+    const target = new URL(url);
+    if (
+      target.protocol === "http:" &&
+      !["localhost", "127.0.0.1", "[::1]"].includes(target.hostname)
+    ) {
+      throw new ToolError(
+        "Refusing to send a registry token over unencrypted HTTP to a non-loopback host; use an https:// registry URL.",
+      );
+    }
     headers.authorization = `Bearer ${options.token}`;
   }
   const doFetch = options.fetch ?? fetch;

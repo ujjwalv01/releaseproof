@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { decide, parseIntent, run } from "./claim-issue.mjs";
+import { decide, MAX_OPEN_CLAIMS, parseIntent, run } from "./claim-issue.mjs";
 
 describe("parseIntent", () => {
   it.each([
@@ -65,6 +65,21 @@ describe("decide", () => {
     });
   });
 
+  it("assigns up to the limit and refuses beyond it", () => {
+    expect(MAX_OPEN_CLAIMS).toBe(3);
+    expect(decide({ ...base, intent: "claim", openClaims: 2 }).action).toBe("assign");
+    const full = decide({ ...base, intent: "claim", openClaims: 3 });
+    expect(full.action).toBe("none");
+    expect(full.reply).toContain("you already have 3 open issues assigned here");
+    expect(full.reply).toContain("at most 3 at a time");
+  });
+
+  it("mentions the limit and the star in the assignment reply", () => {
+    const { reply } = decide({ ...base, intent: "claim" });
+    expect(reply).toContain("You can work on up to 3 issues at a time.");
+    expect(reply).toContain("[repository](https://github.com/o/r) a ⭐");
+  });
+
   it("releases only the commenter's own assignment", () => {
     expect(decide({ ...base, intent: "release", assignees: ["alice"] }).action).toBe("unassign");
     expect(decide({ ...base, intent: "release", assignees: ["bob"] })).toEqual({
@@ -85,8 +100,11 @@ describe("run", () => {
     },
   });
 
-  function fakeApi({ accepted = true } = {}) {
+  function fakeApi({ held = [], accepted = true } = {}) {
     return vi.fn(async (method, path, body) => {
+      if (method === "GET") {
+        return held;
+      }
       if (method === "POST" && path.endsWith("/assignees")) {
         return { assignees: accepted ? body.assignees.map((login) => ({ login })) : [] };
       }
@@ -102,6 +120,21 @@ describe("run", () => {
     expect(api).toHaveBeenLastCalledWith("POST", "/issues/7/comments", {
       body: expect.stringContaining("Assigned to @alice"),
     });
+  });
+
+  it("refuses a fourth issue, counting issues but not pull requests", async () => {
+    const issues = [{ number: 1 }, { number: 2 }, { number: 3 }];
+    const full = fakeApi({ held: issues });
+    await run(event(), full, quiet);
+    expect(full).toHaveBeenCalledWith("GET", "/issues?state=open&assignee=alice&per_page=100");
+    expect(full).not.toHaveBeenCalledWith("POST", "/issues/7/assignees", expect.anything());
+    expect(full).toHaveBeenLastCalledWith("POST", "/issues/7/comments", {
+      body: expect.stringContaining("at most 3 at a time"),
+    });
+
+    const withPr = fakeApi({ held: [...issues.slice(0, 2), { number: 9, pull_request: {} }] });
+    await run(event(), withPr, quiet);
+    expect(withPr).toHaveBeenCalledWith("POST", "/issues/7/assignees", { assignees: ["alice"] });
   });
 
   it("says so when GitHub silently refuses the assignment", async () => {

@@ -18,6 +18,46 @@ pnpm build
 Opt-in tests that talk to the real world: `RELEASEPROOF_NET_TESTS=1` (registry, Sigstore)
 and `RELEASEPROOF_DOCKER_TESTS=1` (real rebuilds). CI runs them weekly.
 
+### Troubleshooting: Corepack cannot start pnpm 12
+
+If `pnpm` fails before installation with an error like:
+
+```text
+Error: Cannot find module '.../corepack/v1/pnpm/12.14.0/bin/pnpm.cjs'
+```
+
+Older Corepack versions look for `bin/pnpm.cjs`, but pnpm 12 uses the
+`bin/pnpm.mjs` launcher for its native executable. Update Corepack and recreate
+the pnpm shims, then retry from the repository root:
+
+```sh
+npm install -g corepack@0.34.6
+corepack --version    # must print 0.34.6; if not, see below before going on
+corepack enable pnpm
+pnpm --version        # 12.14.0, from package.json
+pnpm install
+pnpm check
+```
+
+If `corepack --version` still prints the old version, the Corepack bundled with Node comes
+first on your `PATH`, so the update is installed but never runs. Check which one runs with
+`where.exe corepack` (Windows) or `command -v corepack` (macOS, Linux). With the Windows
+`.msi` installer, the bundled copy lives in `C:\Program Files\nodejs`, which comes before
+npm's global folder `%APPDATA%\npm`. Remove it as the
+[Corepack installation notes](https://github.com/nodejs/corepack#manual-installs) describe
+(Windows Settings → Apps → Node.js → Modify, then deselect the "corepack manager" feature),
+open a new terminal and run `corepack --version` again. When Node is installed
+system-wide on macOS or Linux, `npm install -g` may also need `sudo`.
+
+Tested on Windows with Node 22.22.0: bundled Corepack 0.34.0 reproduced the error,
+and Corepack 0.34.6 restored `pnpm install` and `pnpm check`. The explicit version
+also avoids installing a newer Corepack whose Node engine range excludes
+22.22.0; check that range before choosing a different version.
+
+CI selects current Node 22 and 24 releases through `actions/setup-node`, rather
+than pinning Node 22.22.0. It still runs `corepack enable pnpm`, so the same
+compatible Corepack update applies if a runner ever shows this error.
+
 ## Principles that every change must keep
 
 - **Deterministic.** No LLMs, no heuristics that depend on time or environment. Same input,
@@ -52,9 +92,9 @@ Docker flags or the planner need a unit test and, when they affect real packages
   bigger and need Docker and some reading of `docs/design-rebuild.md`.
 - Claim an issue before starting so two people do not do the same work: comment `/assign`
   (or just "I'd like to work on this") on an open, unassigned issue and it is assigned to you
-  automatically. Comment `/unassign` to give it back. If you want to change something that
-  has no issue yet, open one first and describe the change; for anything security-relevant,
-  read SECURITY.md.
+  automatically. You can hold up to three open issues at a time; comment `/unassign` to give
+  one back. If you want to change something that has no issue yet, open one first and
+  describe the change; for anything security-relevant, read SECURITY.md.
 
 ## Pull requests, step by step
 
@@ -132,6 +172,7 @@ Docker flags or the planner need a unit test and, when they affect real packages
 Rules that apply to every PR:
 
 - Third-party GitHub Actions in workflows are pinned to full commit SHAs, never tags.
+- Dependabot keeps these action pins up to date in a weekly grouped PR, reviewed like any other PR.
 - No new runtime dependency without an issue discussing it first; the CLI is bundled and
   every dependency ships to every user.
 - Nothing in the repository may execute package contents on the host, phone home, or

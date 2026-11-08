@@ -106,3 +106,64 @@ describe("registryBytes", () => {
     await expect(registryBytes("/x", { fetch: asFetch(mock) })).rejects.toThrow(ToolError);
   });
 });
+
+describe.each(["JSON", "tarball"] as const)("%s registry token transport", (kind) => {
+  const load = (registry: string, token: string | undefined, mock: FetchMock) => {
+    const options = { registry, token, fetch: asFetch(mock) };
+    return kind === "JSON" ? registryJson("/x", options) : registryBytes("/x", options);
+  };
+
+  it.each([
+    "http://npm.example.com/",
+    "http://localhost.evil.example/",
+    "http://127.0.0.1.evil.example/",
+    "http://[2001:db8::1]/",
+    "http://user:npm_test_secret@npm.example.com/",
+  ])(
+    "refuses authenticated HTTP to %s before fetch without exposing the token",
+    async (registry) => {
+      const mock = fetchReturning(new Response("{}"));
+      const error = await load(registry, "npm_test_secret", mock).catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(ToolError);
+      expect(error).toMatchObject({ message: expect.stringContaining("https://") });
+      expect((error as Error).message).not.toContain("npm_test_secret");
+      expect(mock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["localhost", "127.0.0.1", "[::1]"])(
+    "preserves authenticated HTTP to loopback %s",
+    async (host) => {
+      const mock = fetchReturning(new Response("{}"));
+      await load(`http://${host}:4873/`, "local_token", mock);
+      expect(mock).toHaveBeenCalledExactlyOnceWith(
+        `http://${host}:4873/x`,
+        expect.objectContaining({
+          headers: expect.objectContaining({ authorization: "Bearer local_token" }),
+        }),
+      );
+    },
+  );
+
+  it("preserves unauthenticated remote HTTP", async () => {
+    const mock = fetchReturning(new Response("{}"));
+    await load("http://npm.example.com/", undefined, mock);
+    expect(mock).toHaveBeenCalledExactlyOnceWith(
+      "http://npm.example.com/x",
+      expect.objectContaining({
+        headers: expect.not.objectContaining({ authorization: expect.anything() }),
+      }),
+    );
+  });
+
+  it("preserves authenticated HTTPS", async () => {
+    const mock = fetchReturning(new Response("{}"));
+    await load("https://npm.example.com/", "https_token", mock);
+    expect(mock).toHaveBeenCalledExactlyOnceWith(
+      "https://npm.example.com/x",
+      expect.objectContaining({
+        headers: expect.objectContaining({ authorization: "Bearer https_token" }),
+      }),
+    );
+  });
+});

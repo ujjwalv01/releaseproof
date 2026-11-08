@@ -5,6 +5,7 @@ import { type CheckCommandOptions, runCheckCommand } from "./commands/check.js";
 
 export function createProgram(): Command {
   const program = new Command()
+    .exitOverride()
     .name("releaseproof")
     .description("Verify that an npm release matches its source before you approve it.")
     .version(pkg.version, "-v, --version");
@@ -28,7 +29,10 @@ export function createProgram(): Command {
     .option("--node <major>", "Node.js major to build with (default: from the release workflow)")
     .option("--build-command <command>", "shell command to build with instead of the detected one")
     .option("--memory <size>", "Docker memory limit for the build containers (default: 4g)")
-    .option("--offline", "use the cached Sigstore trust root without refreshing it")
+    .option(
+      "--offline",
+      "prefer the cached Sigstore trust root (still fetched when missing or expired); registry, GitHub, Docker, dependencies and Rekor may still use network",
+    )
     .option(
       "--no-rekor",
       "skip looking up a staged version's provenance in the Rekor transparency log (the lookup sends Rekor the tarball's SHA-512)",

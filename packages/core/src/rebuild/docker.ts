@@ -115,14 +115,45 @@ export function createDockerClient(options: ExecaDockerOptions = {}): DockerClie
       try {
         return (await docker(["version", "--format", "{{.Server.Version}}"], 30_000)).trim();
       } catch (error) {
-        throw new ToolError(
-          `Docker is not available (is Docker Desktop running?): ${errorMessage(error)}`,
-          { cause: error },
-        );
+        const detail = errorMessage(error);
+        let advice = "Docker is not available (is Docker Desktop running?)";
+        if (/\bENOENT\b|not recognized as an internal or external command/i.test(detail)) {
+          advice =
+            "docker was not found on PATH: install Docker (https://docs.docker.com/get-docker/), or open a new terminal if you just installed it";
+        } else if (
+          /cannot connect to the docker daemon|dockerDesktopLinuxEngine|error during connect/i.test(
+            detail,
+          )
+        ) {
+          advice =
+            "Docker is installed but not running: start Docker Desktop (or the docker service) and try again";
+        }
+        throw new ToolError(`${advice}: ${detail}`, { cause: error });
       }
     },
     async pull(image) {
-      await docker(["pull", "--quiet", image], 15 * 60_000);
+      try {
+        await docker(["pull", "--quiet", image], 15 * 60_000);
+      } catch (error) {
+        const detail = errorMessage(error);
+        const escapedImage = image.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        // Do not mistake a proxy's HTTP 404 or a platform mismatch for a missing image.
+        const imageNotFound = new RegExp(
+          String.raw`(?:^|:\s+)(?:image\s+)?["']?(?:[\w.:-]+/)*${escapedImage}["']?:?\s+not found(?:$|:)`,
+          "im",
+        );
+        if (
+          error instanceof ToolError &&
+          (/\bmanifest (?:unknown\b|for \S+ not found(?:$|:))/im.test(detail) ||
+            imageNotFound.test(detail))
+        ) {
+          throw new ToolError(
+            `image ${JSON.stringify(image)} does not exist; pick a supported Node major with --node, or name an image with --image`,
+            { cause: error },
+          );
+        }
+        throw error;
+      }
     },
     async imageDigest(image) {
       try {

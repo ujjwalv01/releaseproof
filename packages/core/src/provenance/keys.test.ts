@@ -19,6 +19,45 @@ describe("readRegistryKeys", () => {
     expect(readRegistryKeys({})).toBeNull();
     expect(readRegistryKeys("nope")).toBeNull();
   });
+
+  it.each(["2027-01-29T00:00:00.000Z", null, undefined])(
+    "accepts a valid or absent expiry: %s",
+    (expires) => {
+      const keys = readRegistryKeys({
+        keys: [
+          { keyid: "current", key: "public-key", ...(expires === undefined ? {} : { expires }) },
+        ],
+      });
+      expect(keys).toHaveLength(1);
+      expect(keys?.[0]?.expires).toBe(expires ?? null);
+      expect(
+        lookupRegistryKey(keys ?? [], "current", new Date("2026-01-01T00:00:00Z")),
+      ).toMatchObject({
+        ok: true,
+      });
+    },
+  );
+
+  it.each([
+    "soon",
+    "2025-13-45",
+    "",
+    1_700_000_000_000,
+    0,
+    true,
+    false,
+    {},
+    ["2027-01-29T00:00:00.000Z"],
+  ])("rejects the entire list for invalid expiry %j", (expires) => {
+    expect(
+      readRegistryKeys({
+        keys: [
+          { keyid: "valid", key: "public-key", expires: null },
+          { keyid: "invalid", key: "public-key", expires },
+        ],
+      }),
+    ).toBeNull();
+  });
 });
 
 describe("lookupRegistryKey", () => {

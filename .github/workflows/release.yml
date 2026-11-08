@@ -159,8 +159,18 @@ jobs:
           stage: ${{ needs.stage.outputs.stage-id }}
           commit: ${{ github.sha }}
           fail-on: non-zero
+      - name: Upload the staged report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: releaseproof-report-${{ needs.stage.outputs.version }}
+          path: releaseproof-report.json
+          retention-days: 90
+          if-no-files-found: warn
       - name: How to approve
         if: always()
+        env:
+          VERSION: ${{ needs.stage.outputs.version }}
         run: |
           {
             echo "## Approve the release"
@@ -170,4 +180,6 @@ jobs:
             echo '```'
             echo "npx -y npm@latest stage approve ${{ needs.stage.outputs.stage-id }}"
             echo '```'
+            echo
+            echo "The full JSON report is kept as the \`releaseproof-report-${VERSION}\` artifact for 90 days."
           } >> "$GITHUB_STEP_SUMMARY"

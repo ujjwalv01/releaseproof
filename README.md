@@ -73,12 +73,20 @@ verified entry from `--repo` is there, the source is certified and `--commit` is
 fallback (`--no-rekor` skips the lookup).
 
 Options: `--repo <url>` (the repository you expect; with `--commit <sha>` it is the source
-to rebuild from when there is no provenance), `--node <major>` / `--image <image>` /
+to rebuild from when there is no provenance), `--registry <url>` to select the registry
+(default `https://registry.npmjs.org/`), `--token <token>` to provide a registry token
+(default `NPM_TOKEN`, `NODE_AUTH_TOKEN` or `.npmrc`), `--node <major>` / `--image <image>` /
 `--build-command <cmd>` to override the build plan, `--memory <size>` for the container
 memory limit (default `4g`; big TypeScript builds may need more), `--json` for the full report
 (fields are described in [docs/json-report.md](./docs/json-report.md)),
-`--offline` to skip refreshing the Sigstore trust root, `--keep-volume` to inspect the
-build afterwards. Every rule and severity is documented in [docs/rules.md](./docs/rules.md).
+`--offline` to skip refreshing the Sigstore trust root, `--quiet` to suppress progress on
+stderr, `--keep-volume` to inspect the build afterwards. Every rule and severity is
+documented in [docs/rules.md](./docs/rules.md).
+
+`--offline` is **not a no-network mode**: only the Sigstore trust root prefers its cache over
+refreshing, and even it is fetched when the cache is missing or expired. Registry requests, GitHub clones, Docker image pulls, dependency downloads
+and staged Rekor lookups can still use network; `--no-rekor` skips only that lookup.
+See [network access](./docs/faq.md#does---offline-disable-all-network-access) for details.
 
 Requirements: Node 22+, Docker. No account, no API key, no telemetry.
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fixtureContext, ruleContext } from "../../test/context.js";
 import { rawTar } from "../../test/tarballs.js";
 import { readTarball } from "../diff/tarball.js";
+import { buildVerdict } from "../verdict/verdict.js";
 import { runRules } from "./index.js";
 import type { Finding } from "./types.js";
 
@@ -22,6 +23,17 @@ describe("runRules on the fixture packages", () => {
       evidence: { script: "postinstall", command: "node lib/setup.js" },
     });
     expect(findings[1]?.paths).toEqual(["lib/setup.js"]);
+  });
+
+  it("catches an added prepare script as high without an install finding", async () => {
+    const findings = runRules(await fixtureContext("attacked-lifecycle-script"));
+    expect(ids(findings)).toEqual(["high:lifecycle-script-added"]);
+    expect(findings[0]).toMatchObject({
+      title: 'lifecycle script added: "prepare"',
+      paths: ["package.json"],
+      evidence: { script: "prepare", command: "node -e \"console.log('prepare')\"" },
+    });
+    expect(findings.some((finding) => finding.id === "install-script-added")).toBe(false);
   });
 
   it("catches a file the source does not produce", async () => {
@@ -85,6 +97,62 @@ describe("file rules on crafted tarballs", () => {
   const clean = (files: Array<{ path: string; content?: string; mode?: number }>) =>
     readTarball(rawTar(files.map((f) => ({ ...f, path: `package/${f.path}` }))));
 
+  const withEntryKind = (type: "File" | "Directory") =>
+    readTarball(
+      rawTar([
+        { path: "package/package.json", content: "{}" },
+        { path: "package/shared", type, ...(type === "File" ? { content: "ordinary file" } : {}) },
+      ]),
+    );
+
+  it.each([
+    ["File", "Directory", "file", "directory"],
+    ["Directory", "File", "directory", "file"],
+  ] as const)(
+    "flags a %s release entry replacing a %s source entry",
+    (releaseType, sourceType, releaseKind, sourceKind) => {
+      const release = withEntryKind(releaseType);
+      const rebuilt = withEntryKind(sourceType);
+      const context = ruleContext(release, rebuilt);
+      const findings = runRules(context);
+      expect(findings.filter((finding) => finding.id === "file-type-changed")).toEqual([
+        {
+          id: "file-type-changed",
+          severity: "critical",
+          title: "file replaced by a different kind of entry",
+          detail: `shared: ${releaseKind} in the release, ${sourceKind} in the source`,
+          paths: ["shared"],
+        },
+      ]);
+      const source = {
+        repository: "https://github.com/ujjwalv01/releaseproof",
+        commit: "a".repeat(40),
+        verified: true,
+      };
+      const verdict = buildVerdict({
+        artifact: {
+          name: context.name,
+          version: context.version,
+          origin: { kind: "published", registry: "https://registry.npmjs.org/" },
+          hints: {},
+        },
+        provenance: context.provenance,
+        source,
+        rebuild: { status: "ok", source, stages: [], volume: "test" },
+        release,
+        rebuilt,
+        diff: context.diff,
+        expectations: {},
+      });
+      expect(verdict.status).toBe("differs-from-source");
+    },
+  );
+
+  it.each(["File", "Directory"] as const)("is silent for matching %s entry kinds", (kind) => {
+    const tarball = withEntryKind(kind);
+    expect(runRules(ruleContext(tarball, tarball))).toEqual([]);
+  });
+
   it("flags unexpected paths: high when the source lacks them, medium when it has them too", () => {
     const withEditor = clean([
       { path: "package.json", content: "{}" },
@@ -103,6 +171,68 @@ describe("file rules on crafted tarballs", () => {
       (f) => f.id === "unexpected-path",
     );
     expect(medium.map((f) => f.severity)).toEqual(["medium", "medium"]);
+  });
+
+  it.each([
+    "server.key",
+    "certs/server.pem",
+    "certs/client.p12",
+    "client.pfx",
+    "certs/SERVER.KEY",
+    "id_rsa",
+    "nested/id_rsa",
+    ".git-credentials",
+    "nested/.git-credentials",
+    ".netrc",
+    "nested/.netrc",
+    ".ssh/id_rsa",
+    "nested/.ssh/id_rsa",
+    ".aws/credentials",
+    "nested/.aws/config",
+    ".docker/config.json",
+    "nested/.docker/config.json",
+    ".kube/config",
+    "nested/.kube/config",
+  ])("flags credential-looking path %s even when the rebuild contains it", (path) => {
+    const release = clean([{ path, content: "credential fixture" }]);
+    const without = clean([{ path: "package.json", content: "{}" }]);
+    for (const [rebuild, severity] of [
+      [without, "high"],
+      [release, "medium"],
+      [undefined, "high"],
+    ] as const) {
+      const findings = runRules(ruleContext(release, rebuild)).filter(
+        (finding) => finding.id === "unexpected-path",
+      );
+      expect(findings).toHaveLength(1);
+      expect(findings[0]).toMatchObject({ severity, paths: [path] });
+      expect(findings[0]?.detail).toContain("credential");
+    }
+  });
+
+  it("does not flag similar names outside credential path boundaries", () => {
+    const release = clean(
+      [
+        "lib/keyring.js",
+        "lib/monkey",
+        "server.key.js",
+        "cert.pem.bak",
+        "client.p12.txt",
+        "id_rsa.pub",
+        "not_id_rsa",
+        ".git-credentials.example",
+        "my.netrc",
+        ".ssh-config/id_rsa.pub",
+        ".awsome/config",
+        ".kubernetes/config",
+        ".docker/config.json.bak",
+        ".docker/configuration.json",
+        "docker/config.json",
+      ].map((path) => ({ path, content: "ordinary fixture" })),
+    );
+    expect(
+      runRules(ruleContext(release, release)).filter((finding) => finding.id === "unexpected-path"),
+    ).toEqual([]);
   });
 
   it("flags tarball problems as critical even when files match", () => {

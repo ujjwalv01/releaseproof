@@ -30,6 +30,23 @@ describe("parseSpec", () => {
     },
   );
 
+  it.each(["express", "@scope/pkg"])("explains how to give a version for %j", (name) => {
+    expect(() => parseSpec(name)).toThrow(
+      new ToolError(
+        `Give an exact version: ${name}@<version>, for example ${name}@1.2.3 (npm view ${name} version prints the latest)`,
+      ),
+    );
+  });
+
+  it.each([
+    ["bad name@1.0.0", 'Invalid package name "bad name"'],
+    ["bad name", 'Expected <name>@<version>, got "bad name"'],
+    ["express@latest", 'Expected an exact version such as 1.2.3, got "latest"'],
+    ["express@", 'Expected an exact version such as 1.2.3, got ""'],
+  ])("preserves the other parse error for %j", (input, message) => {
+    expect(() => parseSpec(input)).toThrow(new ToolError(message));
+  });
+
   it.each(["sigstore@^5.0.0", "sigstore@latest", "sigstore@5", "sigstore@5.0", "sigstore@v5.0.0"])(
     "rejects range or tag %j: a verdict must be about one tarball",
     (input) => {

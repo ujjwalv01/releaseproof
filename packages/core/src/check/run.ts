@@ -16,6 +16,7 @@ import {
 } from "../rebuild/run.js";
 import { type SourceRef, sourceFromProvenance, validateSource } from "../rebuild/source.js";
 import { parseSpec } from "../registry/spec.js";
+import { normalizeGithubRepository } from "../rules/repository.js";
 import { buildVerdict, type Verdict } from "../verdict/verdict.js";
 
 export interface CheckOptions {
@@ -222,6 +223,16 @@ export async function runCheck(
   options: CheckOptions,
   deps: CheckDeps = defaultDeps,
 ): Promise<CheckReport> {
+  // An unreadable expectation would make provenanceRules compare the certified
+  // repository against undefined and report a false provenance-repository-unexpected.
+  if (
+    options.repository !== undefined &&
+    normalizeGithubRepository(options.repository) === undefined
+  ) {
+    throw new ToolError(
+      `--repo must be a GitHub repository such as https://github.com/owner/repo or owner/repo, got "${options.repository}"`,
+    );
+  }
   const started = Date.now();
   const log = options.log ?? (() => {});
   const registryOptions = {

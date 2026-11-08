@@ -6,7 +6,7 @@ import {
   ToolError,
 } from "@releaseproof/core";
 import { type ActionContext, type ActionInputs, type GetInput, parseInputs } from "./inputs.js";
-import { issueTitle, renderMarkdown } from "./report.js";
+import { issueTitle, renderMarkdown, renderToolErrorMarkdown } from "./report.js";
 
 /** Everything the action touches outside pure computation. Faked in tests. */
 export interface ActionIo {
@@ -67,7 +67,29 @@ export async function runAction(io: ActionIo): Promise<void> {
     });
   } catch (error) {
     if (error instanceof ToolError) {
-      // Environment problems (registry, Docker, bad options) fail closed with the reason.
+      // Environment problems (registry, Docker, bad options) still leave outputs, a summary
+      // and an issue behind before the job fails closed with the reason.
+      io.setOutput("verdict", "could-not-verify");
+      io.setOutput("exit-code", String(ExitCode.ToolError));
+      io.setOutput("summary", error.message);
+      const markdown = renderToolErrorMarkdown(error.message, { runUrl: io.context.runUrl });
+      await io.writeSummary(markdown);
+      if (inputs.createIssue) {
+        try {
+          const url = await io.createIssue({
+            token: inputs.token,
+            title: "releaseproof: could not verify",
+            body: markdown,
+            labels: inputs.issueLabels,
+          });
+          io.setOutput("issue-url", url);
+          io.info(`opened ${url}`);
+        } catch (issueError) {
+          io.warning(
+            `could not open an issue (does the job have "issues: write"?): ${issueError instanceof Error ? issueError.message : String(issueError)}`,
+          );
+        }
+      }
       io.setFailed(`could not verify: ${error.message}`);
       return;
     }

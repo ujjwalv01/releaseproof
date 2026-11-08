@@ -95,6 +95,51 @@ describe("runCheckCommand", () => {
     expect(await runCheckCommand("x@1.0.0", { node: "twenty" }, streams, { runCheck })).toBe(2);
     expect(err[1]).toMatch(/--node expects a Node.js major version/);
   });
+
+  it("with --json a ToolError prints one error object to stdout and keeps the stderr line", async () => {
+    const runCheck = vi.fn(async () => {
+      throw new ToolError("Docker is not available");
+    });
+    const { out, err, io: streams } = io();
+    expect(await runCheckCommand("x@1.0.0", { json: true }, streams, { runCheck })).toBe(2);
+    expect(err).toEqual(["error: Docker is not available\n"]);
+    expect(JSON.parse(out.join(""))).toEqual({ error: { message: "Docker is not available" } });
+  });
+
+  it("without --json a ToolError leaves stdout empty", async () => {
+    const runCheck = vi.fn(async () => {
+      throw new ToolError("Docker is not available");
+    });
+    const { out, err, io: streams } = io();
+    expect(await runCheckCommand("x@1.0.0", {}, streams, { runCheck })).toBe(2);
+    expect(out).toEqual([]);
+    expect(err).toEqual(["error: Docker is not available\n"]);
+  });
+});
+
+describe("runCheckCommand with --image", () => {
+  it.each(["--privileged", "node:", "node:22\n", "node\0", ""])(
+    "rejects %j before running a check",
+    async (image) => {
+      const runCheck = vi.fn(async () => fakeReport(0));
+      const streams = io();
+      expect(await runCheckCommand("x@1.0.0", { image }, streams.io, { runCheck })).toBe(2);
+      expect(runCheck).not.toHaveBeenCalled();
+      expect(streams.out).toEqual([]);
+      expect(streams.err).toEqual([
+        `error: --image must be a Docker image reference such as node:22-bookworm, got ${JSON.stringify(image)}\n`,
+      ]);
+    },
+  );
+
+  it.each(["node:22-bookworm", "registry.example.com:5000/team/node:22", undefined])(
+    "passes valid image %j through unchanged",
+    async (image) => {
+      const runCheck = vi.fn(async (_options: CheckOptions) => fakeReport(0));
+      expect(await runCheckCommand("x@1.0.0", { image }, io().io, { runCheck })).toBe(0);
+      expect(runCheck.mock.calls[0]?.[0].image).toBe(image);
+    },
+  );
 });
 
 describe("runCheckCommand with --memory", () => {
@@ -174,5 +219,32 @@ describe("runCheckCommand with --stage", () => {
       spec: undefined,
       stageId: "123e4567-e89b-12d3-a456-426614174000",
     });
+  });
+});
+
+describe("runCheckCommand with --repo", () => {
+  // The real core runCheck rejects these before fetching anything, so the default
+  // deps keep the test offline and prove the exit code end to end.
+  it.each(["github.com/o/r", "nope"])(
+    "rejects %j with exit code 2 before any fetch",
+    async (repo) => {
+      const streams = io();
+      const code = await runCheckCommand("x@1.0.0", { repo }, streams.io);
+      expect(code).toBe(2);
+      expect(streams.out).toEqual([]);
+      expect(streams.err).toEqual([
+        `error: --repo must be a GitHub repository such as https://github.com/owner/repo or owner/repo, got ${JSON.stringify(repo)}\n`,
+      ]);
+    },
+  );
+
+  it("passes a readable --repo through unchanged", async () => {
+    const runCheck = vi.fn(async (_options: CheckOptions) => fakeReport(0));
+    expect(
+      await runCheckCommand("x@1.0.0", { repo: "git+https://github.com/o/r.git" }, io().io, {
+        runCheck,
+      }),
+    ).toBe(0);
+    expect(runCheck.mock.calls[0]?.[0].repository).toBe("git+https://github.com/o/r.git");
   });
 });

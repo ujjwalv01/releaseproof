@@ -1,0 +1,14 @@
+{
+  "name": "@releaseproof/fixture",
+  "version": "1.0.0",
+  "description": "Tiny package used by releaseproof tests. Not published.",
+  "license": "MIT",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "lib"
+  ],
+  "scripts": {
+    "prepare": "node -e \"console.log('prepare')\""
+  }
+}

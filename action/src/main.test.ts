@@ -97,6 +97,34 @@ function fakeIo(
 }
 
 describe("runAction", () => {
+  it.each(["--privileged", "node:", "node:22\n", "node\0", "   "])(
+    "rejects image %j before running a check",
+    async (image) => {
+      const check = vi.fn(async () => reportWith("matches-source", 0));
+      const { io, actionIo } = fakeIo({ image }, check);
+      await runAction(actionIo);
+      expect(check).not.toHaveBeenCalled();
+      expect(io.failures).toEqual([
+        `Input "image" must be a Docker image reference such as node:22-bookworm, got ${JSON.stringify(image)}`,
+      ]);
+      expect(io.outputs).toEqual({});
+      expect(io.files).toEqual({});
+    },
+  );
+
+  it.each(["node:22-bookworm", "registry.example.com:5000/team/node:22", ""])(
+    "passes valid or absent image %j through",
+    async (image) => {
+      const check = vi.fn(async (_options: Parameters<ActionIo["check"]>[0]) =>
+        reportWith("matches-source", 0),
+      );
+      const { io, actionIo } = fakeIo({ image }, check);
+      await runAction(actionIo);
+      expect(check.mock.calls[0]?.[0].image).toBe(image || undefined);
+      expect(io.failures).toEqual([]);
+    },
+  );
+
   it("runs the check with the inputs, writes outputs, summary and JSON, and fails on a non-zero verdict", async () => {
     const check = vi.fn(async (_options: Parameters<ActionIo["check"]>[0]) =>
       reportWith("differs-from-source", 1),
@@ -120,7 +148,7 @@ describe("runAction", () => {
     expect(JSON.parse(io.files["releaseproof-report.json"] ?? "{}")).toMatchObject({
       verdict: { status: "differs-from-source" },
     });
-    expect(io.summaries[0]).toContain("## 🚨 DIFFERS FROM SOURCE — releaseproof@1.2.3");
+    expect(io.summaries[0]).toContain("## 🚨 DIFFERS FROM SOURCE — `releaseproof@1.2.3`");
     expect(io.failures).toEqual(["DIFFERS-FROM-SOURCE: because"]);
     expect(io.issues).toEqual([]);
   });
@@ -159,17 +187,50 @@ describe("runAction", () => {
     expect(byDefault.io.failures).toHaveLength(1);
   });
 
-  it("fails closed with the reason when the check itself cannot run, and on bad inputs", async () => {
+  it("sets outputs and a summary before failing closed when the check itself errors", async () => {
     const broken = fakeIo({}, async () => {
       throw new ToolError("Docker is not available");
     });
     await runAction(broken.actionIo);
     expect(broken.io.failures).toEqual(["could not verify: Docker is not available"]);
-    expect(broken.io.outputs).toEqual({});
+    expect(broken.io.outputs).toEqual({
+      verdict: "could-not-verify",
+      "exit-code": "2",
+      summary: "Docker is not available",
+    });
+    expect(broken.io.summaries).toHaveLength(1);
+    expect(broken.io.summaries[0]).toContain("## ⚠️ COULD NOT VERIFY — the check itself failed");
+    expect(broken.io.summaries[0]).toContain("```text\nDocker is not available\n```");
+    expect(broken.io.issues).toEqual([]);
+    expect(broken.io.files).toEqual({});
 
     const badInput = fakeIo({ node: "x" }, async () => reportWith("matches-source", 0));
     await runAction(badInput.actionIo);
     expect(badInput.io.failures[0]).toMatch(/Input "node"/);
+    expect(badInput.io.outputs).toEqual({});
+  });
+
+  it("opens an issue when asked even when the check itself errors", async () => {
+    const { io, actionIo } = fakeIo(
+      { "create-issue": "true", "issue-labels": "security", token: "t" },
+      async () => {
+        throw new ToolError("registry is unreachable");
+      },
+    );
+    await runAction(actionIo);
+    expect(io.outputs).toEqual({
+      verdict: "could-not-verify",
+      "exit-code": "2",
+      summary: "registry is unreachable",
+      "issue-url": "https://github.com/ujjwalv01/releaseproof/issues/1",
+    });
+    expect(io.issues).toHaveLength(1);
+    expect(io.issues[0]).toMatchObject({
+      title: "releaseproof: could not verify",
+      labels: ["security"],
+      body: io.summaries[0],
+    });
+    expect(io.failures).toEqual(["could not verify: registry is unreachable"]);
   });
 
   it("only warns when the issue cannot be opened", async () => {

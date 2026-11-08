@@ -13,6 +13,7 @@ import {
   DEFAULT_NODE_MAJOR,
   type PlanOverrides,
   planBuild,
+  validateImageReference,
 } from "./plan.js";
 import {
   CLONE_SCRIPT,
@@ -102,14 +103,15 @@ function textTail(result: ContainerResult, includeStdout: boolean): string {
 
 /**
  * Rebuilds `target` from `source` in Docker and returns the packed tarball. Never throws
- * for a failing build: that is a `failed` result with the stage log. Throws ToolError only
- * when Docker itself is unusable.
+ * for a failing build: that is a `failed` result with the stage log. Throws ToolError for
+ * an invalid image override or when Docker itself is unusable.
  */
 export async function rebuildPackage(
   source: SourceRef,
   target: { name: string; version: string },
   options: RebuildOptions = {},
 ): Promise<RebuildResult> {
+  if (options.overrides?.image !== undefined) validateImageReference(options.overrides.image);
   const docker = options.docker ?? createDockerClient();
   const timeouts = { ...DEFAULT_TIMEOUTS, ...options.timeouts };
   const memory = options.memory ?? "4g";

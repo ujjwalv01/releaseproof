@@ -12,6 +12,21 @@ workflow, and the output. Expect an acknowledgement within a week.
 Please do not open public issues for anything that could let a malicious package escape
 the container, make a tampered release read as MATCHES SOURCE, or leak a token.
 
+## Supported versions
+
+While releaseproof is in `0.x`, only the latest released minor of the
+[`releaseproof` npm package](https://www.npmjs.com/package/releaseproof) and its
+matching GitHub Action version tag receive security fixes. Older minor versions
+are not supported.
+
+Fixes ship as new releases through the
+[staged publishing workflow](./.github/workflows/release.yml): the staged package
+is verified before a maintainer approves it with 2FA. Existing commit SHAs and
+version tags do not change, so update your pinned SHA or tag to receive a fix.
+
+Find the current published version on [npm](https://www.npmjs.com/package/releaseproof)
+and its release notes in the [CLI changelog](./packages/cli/CHANGELOG.md).
+
 ## What releaseproof promises
 
 - Package code never runs on the machine that runs releaseproof. Clone, install, build and

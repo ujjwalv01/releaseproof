@@ -1,9 +1,26 @@
+import { ToolError } from "../errors.js";
 import type { PackageInfo, RepoInspection } from "./inspect.js";
 
 export const WORK_DIR = "/work";
 export const REPO_DIR = "/work/repo";
 export const OUT_DIR = "/work/out";
 export const DEFAULT_NODE_MAJOR = 22;
+
+const IMAGE_PATH_COMPONENT = "[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*";
+const IMAGE_REFERENCE_RE = new RegExp(
+  `^(?:[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]+)?/)?${IMAGE_PATH_COMPONENT}(?:/${IMAGE_PATH_COMPONENT})*(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?(?:@sha256:[a-fA-F0-9]{64})?$`,
+);
+
+/** Common Docker names, optional registry port/tag and SHA-256 digest; never Docker flags. */
+export function validateImageReference(image: string, inputName = "--image"): string {
+  // `$` also matches before a final newline in JavaScript, so reject whitespace separately.
+  if (/\s/.test(image) || !IMAGE_REFERENCE_RE.test(image)) {
+    throw new ToolError(
+      `${inputName} must be a Docker image reference such as node:22-bookworm, got ${JSON.stringify(image)}`,
+    );
+  }
+  return image;
+}
 
 export type PackageManagerName = "npm" | "pnpm" | "yarn-berry" | "yarn-classic";
 
@@ -231,6 +248,7 @@ function managerArgv(manager: PackageManager, ...args: string[]): string[] {
 export function planBuild(input: PlanInput): PlanResult {
   const { inspection, target } = input;
   const overrides = input.overrides ?? {};
+  if (overrides.image !== undefined) validateImageReference(overrides.image);
   const warnings: string[] = [];
 
   const candidates = inspection.packages.filter((pkg) => pkg.name === target.name);

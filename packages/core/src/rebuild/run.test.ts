@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ToolError } from "../errors.js";
 import type { ContainerResult, ContainerSpec, DockerClient } from "./docker.js";
 import type { RepoInspection } from "./inspect.js";
@@ -86,6 +86,25 @@ function happyPath(overrides: Partial<Record<StageName, Responder>> = {}): FakeD
 }
 
 describe("rebuildPackage", () => {
+  it.each(["--privileged", "node:", "node:22\n", "node\0", ""])(
+    "rejects image %j before any Docker call",
+    async (image) => {
+      const docker = happyPath();
+      const calls = [
+        "serverVersion",
+        "createVolume",
+        "pull",
+        "imageDigest",
+        "run",
+        "removeVolume",
+      ].map((method) => vi.spyOn(docker, method as keyof DockerClient));
+      await expect(
+        rebuildPackage(source, target, { docker, overrides: { image } }),
+      ).rejects.toThrow(ToolError);
+      for (const call of calls) expect(call).not.toHaveBeenCalled();
+    },
+  );
+
   it("runs init, clone, install, build and export on one volume and returns the tarball", async () => {
     const docker = happyPath();
     const result = await rebuildPackage(source, target, { docker, volumeId: "abc" });

@@ -83,7 +83,7 @@ Compared field by field against the rebuilt package.json; key order never counts
 | `file-changed` | high | Files whose content differs; a unified diff is attached for text files up to 1 MB. |
 | `binary-added` | high | Added files that are binary and not an image, font or similar asset. |
 | `minified-code-added` | high | Minified code the rebuild did not produce. |
-| `unexpected-path` | high / medium | `.github/`, `.vscode/`, `.idea/`, `.claude/`, `.cursor/`, `CLAUDE.md`-style files, `.git/`, `.env`, `.npmrc`, `.husky/`. Medium when the source produces them too. |
+| `unexpected-path` | high / medium | `.github/`, `.vscode/`, `.idea/`, `.claude/`, `.cursor/`, `CLAUDE.md`-style files, `.git/`, `.env`, `.npmrc`, `.husky/`; credential-looking files at any depth: `*.pem`, `*.key`, `*.p12`, `*.pfx`, `id_rsa`, `.git-credentials`, `.netrc`, `.ssh/`, `.aws/`, `.docker/config.json`, `.kube/`. Medium when the source produces them too. |
 | `file-missing` | medium | Files a clean build produces that the release lacks. |
 | `native-code-present` | info / medium | Native code identical to the source (info), or present with no rebuild to compare with (medium). |
 | `file-changed-whitespace` | low | Only line endings or trailing whitespace differ. |

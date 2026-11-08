@@ -62,6 +62,17 @@ compare release vs rebuild
   command, then `npm pack --pack-destination /work/out`.
 - **Stage 4** streams the tarball to the host over stdout (no `docker cp`, no mounts).
 
+The default timeouts for the three main stages are defined by `DEFAULT_TIMEOUTS` in
+[`packages/core/src/rebuild/run.ts`](../packages/core/src/rebuild/run.ts):
+
+| Stage | Default timeout |
+| --- | --- |
+| `clone` | 10 minutes |
+| `install` | 20 minutes |
+| `build` | 30 minutes |
+
+These limits apply separately to each stage, not to the rebuild as a whole.
+
 Each stage records its command, exit code, duration and (truncated) output. Any failure or
 timeout makes the rebuild `failed` with the stage name and log tail; the verdict is then
 "could not verify", never "matches".
@@ -82,7 +93,15 @@ unsupported in v1.
 release workflow (the workflow's own choice is the most faithful signal), `.nvmrc` /
 `.node-version`, the lowest major allowed by `engines.node`, else 22. Image:
 `node:<major>-bookworm` (full image: has git, python3, make, g++ for native addons). The
-image digest actually used is recorded in the report. `--image` overrides.
+image digest actually used is recorded in the report. `--image` overrides. The CLI and
+Action validate the override before starting a check, and the core rebuild validates it
+before any Docker call. Common names, registry ports, tags and SHA-256 digests (including
+tag-plus-digest references) are accepted. Flag-like values, whitespace/control characters
+and empty names or tags are tool errors; omitting the override keeps the detected image.
+
+If Docker reports a missing image or manifest, the tool error names the image and suggests
+`--node` with a supported major or an explicit `--image`; not every major has a bookworm
+image. Network, authentication and platform-mismatch failures keep their raw Docker detail.
 
 **Build command.** If the package has a `build` script: pnpm → `pnpm --filter "<name>..." run
 build` (builds workspace dependencies first, topologically); Yarn Berry → `yarn workspaces
