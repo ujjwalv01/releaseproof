@@ -72,14 +72,28 @@ describe("lookupRegistryKey", () => {
     }
   });
 
-  it("refuses an expired key", () => {
+  it("refuses a key that had expired when the signature was made", () => {
     expect(
       lookupRegistryKey(keys, "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA", now),
     ).toEqual({
       ok: false,
       problem:
-        "registry signing key SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA expired on 2025-01-29T00:00:00.000Z",
+        "registry signing key SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA expired on 2025-01-29T00:00:00.000Z, before 2026-10-17T00:00:00.000Z",
     });
+  });
+
+  it("accepts a rotated key for signatures made before it expired, as npm does", () => {
+    const oldKey = "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA";
+    // sigstore@2.0.0's publish attestation was logged on 2023-08-18 with this key.
+    expect(lookupRegistryKey(keys, oldKey, new Date("2023-08-18T15:25:38Z")).ok).toBe(true);
+    expect(lookupRegistryKey(keys, oldKey, new Date("2025-01-28T23:59:59Z")).ok).toBe(true);
+    expect(lookupRegistryKey(keys, oldKey, new Date("2025-01-29T00:00:00Z")).ok).toBe(false);
+  });
+
+  it("checks against the current time when no signing time is given", () => {
+    expect(lookupRegistryKey(keys, "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA").ok).toBe(
+      false,
+    );
   });
 
   it("refuses an unknown keyid", () => {

@@ -75,7 +75,6 @@ export interface VerifyProvenanceOptions {
   tufCachePath?: string | undefined;
   /** Use the cached Sigstore trust root without refreshing it over the network. */
   offline?: boolean | undefined;
-  now?: Date | undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -123,6 +122,31 @@ function readTransparencyLog(bundle: Record<string, unknown>): ProvenanceResult[
     return undefined;
   }
   return { logIndex: String(logIndex), integratedTime: String(integratedTime) };
+}
+
+/**
+ * When a key-signed bundle was signed, from its transparency log entry. Only an entry with a
+ * signed entry timestamp counts: Rekor signs `integratedTime` there, and sigstore verifies that
+ * signature with the bundle, so a forged time fails verification. An inclusion proof alone does
+ * not cover the time, so it gives undefined, and the caller falls back to "valid now".
+ */
+export function signedLogTime(bundle: Record<string, unknown>): Date | undefined {
+  const material = bundle.verificationMaterial;
+  const entries = isRecord(material) ? material.tlogEntries : undefined;
+  const first = Array.isArray(entries) && entries.length === 1 ? entries[0] : undefined;
+  if (!isRecord(first) || !isRecord(first.inclusionPromise)) {
+    return undefined;
+  }
+  const { signedEntryTimestamp } = first.inclusionPromise;
+  const time = first.integratedTime;
+  if (typeof signedEntryTimestamp !== "string" || signedEntryTimestamp === "") {
+    return undefined;
+  }
+  if (!(typeof time === "string" && /^\d{1,12}$/.test(time)) && !Number.isSafeInteger(time)) {
+    return undefined;
+  }
+  const seconds = Number(time);
+  return seconds > 0 ? new Date(seconds * 1000) : undefined;
 }
 
 /** Every field where the job's claim disagrees with what the certificate attests. */
@@ -205,7 +229,8 @@ async function verifyPublishAttestation(
   if (!options.registryKeys) {
     return invalid("registry signing keys were not available");
   }
-  const lookup = lookupRegistryKey(options.registryKeys, hint, options.now);
+  // The key only has to be valid when the registry signed, not today (npm rotates its keys).
+  const lookup = lookupRegistryKey(options.registryKeys, hint, signedLogTime(entry.bundle));
   if (!lookup.ok) {
     return invalid(lookup.problem);
   }

@@ -64662,13 +64662,16 @@ async function fetchRegistryKeys(options = {}) {
   const body = await registryJson("/-/npm/v1/keys", options);
   return body === null ? null : readRegistryKeys(body);
 }
-function lookupRegistryKey(keys, keyid, now = /* @__PURE__ */ new Date()) {
+function lookupRegistryKey(keys, keyid, signedAt = /* @__PURE__ */ new Date()) {
   const key = keys.find((candidate) => candidate.keyid === keyid);
   if (!key) {
     return { ok: false, problem: `the registry has no signing key with keyid ${keyid}` };
   }
-  if (key.expires && new Date(key.expires).getTime() <= now.getTime()) {
-    return { ok: false, problem: `registry signing key ${keyid} expired on ${key.expires}` };
+  if (key.expires && new Date(key.expires).getTime() <= signedAt.getTime()) {
+    return {
+      ok: false,
+      problem: `registry signing key ${keyid} expired on ${key.expires}, before ${signedAt.toISOString()}`
+    };
   }
   return { ok: true, pem: `-----BEGIN PUBLIC KEY-----
 ${key.key}
@@ -65069,6 +65072,24 @@ function readTransparencyLog(bundle) {
   }
   return { logIndex: String(logIndex), integratedTime: String(integratedTime) };
 }
+function signedLogTime(bundle) {
+  const material = bundle.verificationMaterial;
+  const entries = isRecord5(material) ? material.tlogEntries : void 0;
+  const first = Array.isArray(entries) && entries.length === 1 ? entries[0] : void 0;
+  if (!isRecord5(first) || !isRecord5(first.inclusionPromise)) {
+    return void 0;
+  }
+  const { signedEntryTimestamp } = first.inclusionPromise;
+  const time = first.integratedTime;
+  if (typeof signedEntryTimestamp !== "string" || signedEntryTimestamp === "") {
+    return void 0;
+  }
+  if (!(typeof time === "string" && /^\d{1,12}$/.test(time)) && !Number.isSafeInteger(time)) {
+    return void 0;
+  }
+  const seconds = Number(time);
+  return seconds > 0 ? new Date(seconds * 1e3) : void 0;
+}
 function crossCheck(certificate, claim) {
   const mismatches = [];
   const compare = (field, fromCertificate, fromPredicate) => {
@@ -65134,7 +65155,7 @@ async function verifyPublishAttestation(entries, input, options, verifier, bundl
   if (!options.registryKeys) {
     return invalid("registry signing keys were not available");
   }
-  const lookup2 = lookupRegistryKey(options.registryKeys, hint, options.now);
+  const lookup2 = lookupRegistryKey(options.registryKeys, hint, signedLogTime(entry.bundle));
   if (!lookup2.ok) {
     return invalid(lookup2.problem);
   }

@@ -56,14 +56,26 @@ export async function fetchRegistryKeys(
 
 export type KeyLookup = { ok: true; pem: string } | { ok: false; problem: string };
 
-/** Finds a usable key by keyid. Expired keys are refused, as npm does. */
-export function lookupRegistryKey(keys: RegistryKey[], keyid: string, now = new Date()): KeyLookup {
+/**
+ * Finds a usable key by keyid. A key that expires is still valid for signatures made before
+ * its expiry, as `npm audit signatures` treats it: npm rotates keys, and every attestation
+ * signed with the old key stays valid. `signedAt` must be a time the caller can trust
+ * (verified by the transparency log); without one, the key must still be valid now.
+ */
+export function lookupRegistryKey(
+  keys: RegistryKey[],
+  keyid: string,
+  signedAt: Date = new Date(),
+): KeyLookup {
   const key = keys.find((candidate) => candidate.keyid === keyid);
   if (!key) {
     return { ok: false, problem: `the registry has no signing key with keyid ${keyid}` };
   }
-  if (key.expires && new Date(key.expires).getTime() <= now.getTime()) {
-    return { ok: false, problem: `registry signing key ${keyid} expired on ${key.expires}` };
+  if (key.expires && new Date(key.expires).getTime() <= signedAt.getTime()) {
+    return {
+      ok: false,
+      problem: `registry signing key ${keyid} expired on ${key.expires}, before ${signedAt.toISOString()}`,
+    };
   }
   return { ok: true, pem: `-----BEGIN PUBLIC KEY-----\n${key.key}\n-----END PUBLIC KEY-----\n` };
 }

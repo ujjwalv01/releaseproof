@@ -45,6 +45,24 @@ describe.skipIf(!process.env.RELEASEPROOF_NET_TESTS)("verifyProvenance (network)
     expect(result.problems[0]).toMatch(/signature verification failed/);
   }, 60_000);
 
+  it("accepts a publish attestation signed before npm rotated its key (sigstore@2.0.0)", async () => {
+    // Logged on 2023-08-18 with SHA256:jl3b…, which the registry lists as expired on 2025-01-29.
+    const artifact = await fetchPublished("sigstore@2.0.0");
+    const registryKeys = await fetchRegistryKeys();
+    const result = await verifyProvenance(
+      {
+        purl: artifact.purl,
+        sha512Hex: artifact.digests.sha512Hex,
+        attestations: artifact.attestations,
+      },
+      { registryKeys, tufCachePath },
+    );
+    expect(result.publishAttestation).toEqual({
+      status: "verified",
+      keyid: "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA",
+    });
+  }, 60_000);
+
   it("fetches the real package and its attestations", async () => {
     const artifact = await fetchPublished("sigstore@5.0.0");
     expect(artifact.digests.sha512Hex).toBe(SIGSTORE_5.sha512Hex);

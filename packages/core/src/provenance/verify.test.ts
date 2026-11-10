@@ -9,7 +9,7 @@ import {
 } from "../../test/fixtures.js";
 import type { SignerIdentityLike } from "./certificate.js";
 import { NPM_PUBLISH_ATTESTATION_V01, SLSA_PROVENANCE_V1 } from "./predicate.js";
-import { type BundleVerifier, crossCheck, verifyProvenance } from "./verify.js";
+import { type BundleVerifier, crossCheck, signedLogTime, verifyProvenance } from "./verify.js";
 
 const input = {
   purl: SIGSTORE_5.purl,
@@ -281,16 +281,110 @@ describe("verifyProvenance", () => {
         ...key,
         expires: "2026-01-01T00:00:00.000Z",
       }));
-      const expiredResult = await verifyProvenance(input, {
-        verifier,
-        registryKeys: expired,
-        now: new Date("2026-10-17"),
-      });
-      expect(expiredResult.publishAttestation.problem).toMatch(/expired on 2026-01-01/);
+      // The fixture's publish attestation was logged on 2026-06-01, after this expiry.
+      const expiredResult = await verifyProvenance(input, { verifier, registryKeys: expired });
+      expect(expiredResult.publishAttestation.problem).toMatch(
+        /expired on 2026-01-01T00:00:00.000Z, before 2026-06-01T/,
+      );
 
       // The provenance verdict does not depend on the publish attestation.
       expect(noKeys.status).toBe("verified");
     });
+
+    const OLD_KEY = "SHA256:jl3bwswu80PjjokCgh0o2w5c2U4LhQAE57gj9cz1kzA";
+    /** The fixture with its publish attestation re-pointed at npm's old key (expired 2025-01-29). */
+    function signedWithOldKey(edit: (tlogEntry: Record<string, unknown>) => void = () => {}) {
+      const attestations = structuredClone(input.attestations);
+      const publish = attestations.attestations.find(
+        (a) => a.predicateType === NPM_PUBLISH_ATTESTATION_V01,
+      );
+      const material = publish?.bundle.verificationMaterial as {
+        publicKey: { hint: string };
+        tlogEntries: Record<string, unknown>[];
+      };
+      material.publicKey.hint = OLD_KEY;
+      const [entry] = material.tlogEntries;
+      if (!entry) {
+        throw new Error("fixture has no tlog entry");
+      }
+      entry.integratedTime = "1692372338"; // 2023-08-18, when sigstore@2.0.0 was published
+      edit(entry);
+      return { ...input, attestations };
+    }
+
+    it("accepts a rotated registry key for an attestation logged before it expired (#78)", async () => {
+      const verifier = verifierReturning();
+      const result = await verifyProvenance(signedWithOldKey(), {
+        verifier,
+        registryKeys: sigstoreKeys(),
+      });
+      expect(result.publishAttestation).toEqual({ status: "verified", keyid: OLD_KEY });
+      // The old key's PEM is what the signature is checked against.
+      const publishCall = verifier.mock.calls.find(([bundle]) =>
+        bundle.mediaType.includes("version=0.2"),
+      );
+      expect(publishCall?.[1].keySelector?.(OLD_KEY)).toMatch(/BEGIN PUBLIC KEY/);
+    });
+
+    it("refuses the rotated key for an attestation logged after it expired", async () => {
+      const result = await verifyProvenance(
+        signedWithOldKey((entry) => {
+          entry.integratedTime = "1738108800"; // 2025-01-29T00:00:00Z
+        }),
+        { verifier: verifierReturning(), registryKeys: sigstoreKeys() },
+      );
+      expect(result.publishAttestation).toEqual({
+        status: "invalid",
+        problem: `registry signing key ${OLD_KEY} expired on 2025-01-29T00:00:00.000Z, before 2025-01-29T00:00:00.000Z`,
+      });
+    });
+
+    it("does not trust a log time without a signed entry timestamp", async () => {
+      // Only Rekor's SET signs integratedTime; without it the key must be valid today.
+      const result = await verifyProvenance(
+        signedWithOldKey((entry) => {
+          delete entry.inclusionPromise;
+        }),
+        { verifier: verifierReturning(), registryKeys: sigstoreKeys() },
+      );
+      expect(result.publishAttestation.status).toBe("invalid");
+      expect(result.publishAttestation.problem).toMatch(/expired on 2025-01-29/);
+    });
+  });
+});
+
+describe("signedLogTime", () => {
+  const bundle = (entry: Record<string, unknown>, extra: Record<string, unknown>[] = []) => ({
+    verificationMaterial: { tlogEntries: [entry, ...extra] },
+  });
+  const promise = { signedEntryTimestamp: "MEUCIQ" };
+
+  it("reads integratedTime when the entry carries a signed entry timestamp", () => {
+    expect(
+      signedLogTime(bundle({ integratedTime: "1692372338", inclusionPromise: promise })),
+    ).toEqual(new Date("2023-08-18T15:25:38.000Z"));
+    expect(
+      signedLogTime(bundle({ integratedTime: 1692372338, inclusionPromise: promise })),
+    ).toEqual(new Date("2023-08-18T15:25:38.000Z"));
+  });
+
+  it.each([
+    ["no inclusion promise", bundle({ integratedTime: "1692372338" })],
+    [
+      "an empty SET",
+      bundle({ integratedTime: "1692372338", inclusionPromise: { signedEntryTimestamp: "" } }),
+    ],
+    ["a non-numeric time", bundle({ integratedTime: "soon", inclusionPromise: promise })],
+    ["a zero time", bundle({ integratedTime: "0", inclusionPromise: promise })],
+    ["a negative time", bundle({ integratedTime: -5, inclusionPromise: promise })],
+    [
+      "two log entries",
+      bundle({ integratedTime: "1", inclusionPromise: promise }, [{ integratedTime: "2" }]),
+    ],
+    ["no log entries", { verificationMaterial: { tlogEntries: [] } }],
+    ["no verification material", {}],
+  ])("gives no time for %s", (_label, input) => {
+    expect(signedLogTime(input)).toBeUndefined();
   });
 });
 
