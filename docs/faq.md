@@ -232,7 +232,7 @@ The text report shortens the digest for display. Use `--json` and read `rebuild.
 The GitHub Action accepts the same reference through its `image` input:
 
 ```yaml
-- uses: ujjwalv01/releaseproof@v0.1.0
+- uses: ujjwalv01/releaseproof@v0.2.2
   with:
     image: node@sha256:<64-hex-digest>
 ```
