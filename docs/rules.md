@@ -65,7 +65,7 @@ Compared field by field against the rebuilt package.json; key order never counts
 | `entry-point-changed` | high | `main`, `module`, `browser`, `exports`, `bin`, `types`, `typings` or `imports` differ. |
 | `rebuild-manifest-unreadable` | high | The rebuilt package.json could not be read, so nothing could be compared. |
 | `install-script-present` | medium / info | An install script exists. Medium when there is no rebuild to compare with; info when it is identical to the source. |
-| `dependency-changed` | medium | A dependency's range differs. |
+| `dependency-changed` | high / medium | A dependency's range differs. High when a registry range is repointed to a non-registry spec (git URL, tarball URL, file/link, or `npm:` alias); medium otherwise. |
 | `manifest-field-changed` | medium | Any other top-level field differs (version bumps by release tooling show up here). |
 | `dependency-removed` | low | The source has a dependency the release lacks. |
 | `script-changed` | low | Non-lifecycle scripts differ. |

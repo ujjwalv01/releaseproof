@@ -87,6 +87,44 @@ describe("manifestRules", () => {
     ]);
   });
 
+  it("grades dependency-changed as high when repointed to a non-registry spec", () => {
+    const nonRegistrySpecs = [
+      "git+https://github.com/someone/lodash.git",
+      "git://github.com/someone/lodash.git",
+      "git@github.com:someone/lodash.git",
+      "github:someone/lodash",
+      "gitlab:someone/lodash",
+      "bitbucket:someone/lodash",
+      "gist:123456",
+      "https://example.com/lodash-4.17.21.tgz",
+      "http://example.com/lodash-4.17.21.tgz",
+      "npm:lodash-fork@4.17.21",
+      "file:../vendor/lodash",
+      "link:../vendor/lodash",
+      "someone/lodash",
+    ];
+    for (const spec of nonRegistrySpecs) {
+      expect(findings({ ...base, dependencies: { a: spec } }, base)).toEqual([
+        "high:dependency-changed",
+      ]);
+    }
+    expect(
+      findings(
+        { ...base, dependencies: { a: "^1.3.0" } },
+        { ...base, dependencies: { a: "^1.2.0" } },
+      ),
+    ).toEqual(["medium:dependency-changed"]);
+    expect(
+      findings({ ...base, dependencies: { a: "*" } }, { ...base, dependencies: { a: "^1.2.0" } }),
+    ).toEqual(["medium:dependency-changed"]);
+    expect(
+      findings(
+        { ...base, dependencies: { a: "git+https://github.com/someone/other.git" } },
+        { ...base, dependencies: { a: "git+https://github.com/someone/lodash.git" } },
+      ),
+    ).toEqual(["medium:dependency-changed"]);
+  });
+
   it("flags changed entry points as high and other field changes as medium", () => {
     expect(findings({ ...base, main: "lib/evil.js" }, base)).toEqual(["high:entry-point-changed"]);
     expect(findings({ ...base, bin: { x: "./cli.js" } }, base)).toEqual([
