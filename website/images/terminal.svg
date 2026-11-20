@@ -1,19 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="346" viewBox="0 0 800 346" role="img" aria-label="A releaseproof check in a terminal">
-<rect width="800" height="346" rx="6" fill="#1e1e1e"/>
-<g font-family="Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace" font-size="13">
-<text x="20" y="34" fill="#ffffff">$ npx releaseproof check sigstore@5.0.0</text>
-<text x="20" y="52" fill="#9a9a9a">… fetching sigstore@5.0.0</text>
-<text x="20" y="70" fill="#9a9a9a">… verifying provenance</text>
-<text x="20" y="88" fill="#9a9a9a">… provenance: verified</text>
-<text x="20" y="106" fill="#9a9a9a">… rebuilding from https://github.com/sigstore/sigstore-js@7d2900e</text>
-<text x="20" y="124" fill="#9a9a9a">… compared: 9 identical, 0 changed, 0 only in release, 0 only in rebuild</text>
-<text x="20" y="142" fill="#d8d8d8">releaseproof check sigstore@5.0.0</text>
-<text x="20" y="178" fill="#d8d8d8"><tspan x="20">Package</tspan><tspan x="126">sigstore@5.0.0 (registry.npmjs.org), 9 files, sha512 849a897e81bf…</tspan></text>
-<text x="20" y="196" fill="#d8d8d8"><tspan x="20">Provenance</tspan><tspan x="126">VERIFIED  sigstore/sigstore-js@7d2900e on refs/heads/main</tspan></text>
-<text x="20" y="214" fill="#d8d8d8"><tspan x="126">workflow .github/workflows/release.yml, trigger push, github-hosted runner</tspan></text>
-<text x="20" y="232" fill="#d8d8d8"><tspan x="20">Rebuild</tspan><tspan x="126">OK (2m 14s)  node:22-bookworm, npm 10.9.9, build: root "build" script</tspan></text>
-<text x="20" y="250" fill="#d8d8d8"><tspan x="20">Files</tspan><tspan x="126">9 identical, 0 changed, 0 only in release, 0 only in rebuild</tspan></text>
-<text x="20" y="286" fill="#d8d8d8"><tspan x="20">Findings</tspan><tspan x="126">none</tspan></text>
-<text x="20" y="322" fill="#5fd97a" font-weight="bold">Verdict: MATCHES SOURCE: 9 files identical to a clean build of sigstore/sigstore-js@7d2900e</text>
+<rect width="800" height="346" fill="#2b1e16"/>
+<g font-family="'Courier New', Courier, 'Liberation Mono', monospace" font-size="13">
+<text x="20" y="34" fill="#fff8ea">$ npx releaseproof check sigstore@5.0.0</text>
+<text x="20" y="52" fill="#a8937d">… fetching sigstore@5.0.0</text>
+<text x="20" y="70" fill="#a8937d">… verifying provenance</text>
+<text x="20" y="88" fill="#a8937d">… provenance: verified</text>
+<text x="20" y="106" fill="#a8937d">… rebuilding from https://github.com/sigstore/sigstore-js@7d2900e</text>
+<text x="20" y="124" fill="#a8937d">… compared: 9 identical, 0 changed, 0 only in release, 0 only in rebuild</text>
+<text x="20" y="142" fill="#eadfcd">releaseproof check sigstore@5.0.0</text>
+<text x="20" y="178" fill="#eadfcd"><tspan x="20">Package</tspan><tspan x="126">sigstore@5.0.0 (registry.npmjs.org), 9 files, sha512 849a897e81bf…</tspan></text>
+<text x="20" y="196" fill="#eadfcd"><tspan x="20">Provenance</tspan><tspan x="126">VERIFIED  sigstore/sigstore-js@7d2900e on refs/heads/main</tspan></text>
+<text x="20" y="214" fill="#eadfcd"><tspan x="126">workflow .github/workflows/release.yml, trigger push, github-hosted runner</tspan></text>
+<text x="20" y="232" fill="#eadfcd"><tspan x="20">Rebuild</tspan><tspan x="126">OK (2m 14s)  node:22-bookworm, npm 10.9.9, build: root "build" script</tspan></text>
+<text x="20" y="250" fill="#eadfcd"><tspan x="20">Files</tspan><tspan x="126">9 identical, 0 changed, 0 only in release, 0 only in rebuild</tspan></text>
+<text x="20" y="286" fill="#eadfcd"><tspan x="20">Findings</tspan><tspan x="126">none</tspan></text>
+<text x="20" y="322" fill="#bcdc8c" font-weight="bold">Verdict: MATCHES SOURCE: 9 files identical to a clean build of sigstore/sigstore-js@7d2900e</text>
 </g>
 </svg>

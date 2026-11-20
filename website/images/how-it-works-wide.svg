@@ -1,50 +1,50 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="242" viewBox="0 0 900 242" role="img" aria-label="How a releaseproof check works" font-family="Arial, Helvetica, sans-serif">
-<rect x="10" y="10" width="160" height="122" rx="5" fill="#ffffff" stroke="#b9b9b9"/>
-<text x="22" y="35" font-weight="bold" font-size="15" fill="#3b5998">1. Fetch</text>
-<path d="M11 46.5 H169" stroke="#e1e1e1"/>
-<text x="22" y="68" font-size="13" fill="#222222">the tarball and its</text>
-<text x="22" y="86" font-size="13" fill="#222222">attestations from</text>
-<text x="22" y="104" font-size="13" fill="#222222">the npm registry</text>
-<path d="M172 71 H183" stroke="#8a8a8a" stroke-width="1.5"/><path d="M181 66.5 L188 71 L181 75.5 Z" fill="#8a8a8a"/>
-<rect x="190" y="10" width="160" height="122" rx="5" fill="#ffffff" stroke="#b9b9b9"/>
-<text x="202" y="35" font-weight="bold" font-size="15" fill="#3b5998">2. Verify</text>
-<path d="M191 46.5 H349" stroke="#e1e1e1"/>
-<text x="202" y="68" font-size="13" fill="#222222">the provenance</text>
-<text x="202" y="86" font-size="13" fill="#222222">against the Sigstore</text>
-<text x="202" y="104" font-size="13" fill="#222222">trust root</text>
-<path d="M352 71 H363" stroke="#8a8a8a" stroke-width="1.5"/><path d="M361 66.5 L368 71 L361 75.5 Z" fill="#8a8a8a"/>
-<rect x="370" y="10" width="160" height="122" rx="5" fill="#ffffff" stroke="#b9b9b9"/>
-<text x="382" y="35" font-weight="bold" font-size="15" fill="#3b5998">3. Rebuild</text>
-<path d="M371 46.5 H529" stroke="#e1e1e1"/>
-<text x="382" y="68" font-size="13" fill="#222222">from the certified</text>
-<text x="382" y="86" font-size="13" fill="#222222">commit in Docker;</text>
-<text x="382" y="104" font-size="13" fill="#222222">the build step has</text>
-<text x="382" y="122" font-size="13" fill="#222222">no network</text>
-<path d="M532 71 H543" stroke="#8a8a8a" stroke-width="1.5"/><path d="M541 66.5 L548 71 L541 75.5 Z" fill="#8a8a8a"/>
-<rect x="550" y="10" width="160" height="122" rx="5" fill="#ffffff" stroke="#b9b9b9"/>
-<text x="562" y="35" font-weight="bold" font-size="15" fill="#3b5998">4. Compare</text>
-<path d="M551 46.5 H709" stroke="#e1e1e1"/>
-<text x="562" y="68" font-size="13" fill="#222222">the release and</text>
-<text x="562" y="86" font-size="13" fill="#222222">the rebuild,</text>
-<text x="562" y="104" font-size="13" fill="#222222">file by file</text>
-<path d="M712 71 H723" stroke="#8a8a8a" stroke-width="1.5"/><path d="M721 66.5 L728 71 L721 75.5 Z" fill="#8a8a8a"/>
-<rect x="730" y="10" width="160" height="122" rx="5" fill="#ffffff" stroke="#b9b9b9"/>
-<text x="742" y="35" font-weight="bold" font-size="15" fill="#3b5998">5. Decide</text>
-<path d="M731 46.5 H889" stroke="#e1e1e1"/>
-<text x="742" y="68" font-size="13" fill="#222222">graded rules turn</text>
-<text x="742" y="86" font-size="13" fill="#222222">what differs into</text>
-<text x="742" y="104" font-size="13" fill="#222222">one verdict</text>
-<path d="M810 132 V152 H150" fill="none" stroke="#8a8a8a" stroke-width="1.5"/>
-<path d="M150 152 V167" stroke="#8a8a8a" stroke-width="1.5"/><path d="M145.5 165 L150 172 L154.5 165 Z" fill="#8a8a8a"/>
-<rect x="15" y="173" width="270" height="58" rx="5" fill="#eaf6ec" stroke="#1a7f37"/>
-<text x="150" y="199" text-anchor="middle" font-weight="bold" font-size="15" fill="#1a7f37">MATCHES SOURCE</text>
-<text x="150" y="217" text-anchor="middle" font-size="12.5" fill="#222222">exit code 0</text>
-<path d="M450 152 V167" stroke="#8a8a8a" stroke-width="1.5"/><path d="M445.5 165 L450 172 L454.5 165 Z" fill="#8a8a8a"/>
-<rect x="315" y="173" width="270" height="58" rx="5" fill="#fdecea" stroke="#c62828"/>
-<text x="450" y="199" text-anchor="middle" font-weight="bold" font-size="15" fill="#c62828">DIFFERS FROM SOURCE</text>
-<text x="450" y="217" text-anchor="middle" font-size="12.5" fill="#222222">exit code 1: read the findings</text>
-<path d="M750 152 V167" stroke="#8a8a8a" stroke-width="1.5"/><path d="M745.5 165 L750 172 L754.5 165 Z" fill="#8a8a8a"/>
-<rect x="615" y="173" width="270" height="58" rx="5" fill="#fff6da" stroke="#b88a00"/>
-<text x="750" y="199" text-anchor="middle" font-weight="bold" font-size="15" fill="#7a5a00">COULD NOT VERIFY</text>
-<text x="750" y="217" text-anchor="middle" font-size="12.5" fill="#222222">exit code 2: never "safe"</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="242" viewBox="0 0 900 242" role="img" aria-label="How a releaseproof check works" font-family="Georgia, 'Times New Roman', Times, serif">
+<rect x="10" y="10" width="160" height="122" fill="#fdf8ee" stroke="#a98e6c"/>
+<text x="22" y="35" font-weight="bold" font-size="15" fill="#6f3d17">1. Fetch</text>
+<path d="M11 46.5 H169" stroke="#d9c7a8"/>
+<text x="22" y="68" font-size="13" fill="#2f2219">the tarball and its</text>
+<text x="22" y="86" font-size="13" fill="#2f2219">attestations from</text>
+<text x="22" y="104" font-size="13" fill="#2f2219">the npm registry</text>
+<path d="M172 71 H183" stroke="#8a7258" stroke-width="1.5"/><path d="M181 66.5 L188 71 L181 75.5 Z" fill="#8a7258"/>
+<rect x="190" y="10" width="160" height="122" fill="#fdf8ee" stroke="#a98e6c"/>
+<text x="202" y="35" font-weight="bold" font-size="15" fill="#6f3d17">2. Verify</text>
+<path d="M191 46.5 H349" stroke="#d9c7a8"/>
+<text x="202" y="68" font-size="13" fill="#2f2219">the provenance</text>
+<text x="202" y="86" font-size="13" fill="#2f2219">against the Sigstore</text>
+<text x="202" y="104" font-size="13" fill="#2f2219">trust root</text>
+<path d="M352 71 H363" stroke="#8a7258" stroke-width="1.5"/><path d="M361 66.5 L368 71 L361 75.5 Z" fill="#8a7258"/>
+<rect x="370" y="10" width="160" height="122" fill="#fdf8ee" stroke="#a98e6c"/>
+<text x="382" y="35" font-weight="bold" font-size="15" fill="#6f3d17">3. Rebuild</text>
+<path d="M371 46.5 H529" stroke="#d9c7a8"/>
+<text x="382" y="68" font-size="13" fill="#2f2219">from the certified</text>
+<text x="382" y="86" font-size="13" fill="#2f2219">commit in Docker;</text>
+<text x="382" y="104" font-size="13" fill="#2f2219">the build step has</text>
+<text x="382" y="122" font-size="13" fill="#2f2219">no network</text>
+<path d="M532 71 H543" stroke="#8a7258" stroke-width="1.5"/><path d="M541 66.5 L548 71 L541 75.5 Z" fill="#8a7258"/>
+<rect x="550" y="10" width="160" height="122" fill="#fdf8ee" stroke="#a98e6c"/>
+<text x="562" y="35" font-weight="bold" font-size="15" fill="#6f3d17">4. Compare</text>
+<path d="M551 46.5 H709" stroke="#d9c7a8"/>
+<text x="562" y="68" font-size="13" fill="#2f2219">the release and</text>
+<text x="562" y="86" font-size="13" fill="#2f2219">the rebuild,</text>
+<text x="562" y="104" font-size="13" fill="#2f2219">file by file</text>
+<path d="M712 71 H723" stroke="#8a7258" stroke-width="1.5"/><path d="M721 66.5 L728 71 L721 75.5 Z" fill="#8a7258"/>
+<rect x="730" y="10" width="160" height="122" fill="#fdf8ee" stroke="#a98e6c"/>
+<text x="742" y="35" font-weight="bold" font-size="15" fill="#6f3d17">5. Decide</text>
+<path d="M731 46.5 H889" stroke="#d9c7a8"/>
+<text x="742" y="68" font-size="13" fill="#2f2219">graded rules turn</text>
+<text x="742" y="86" font-size="13" fill="#2f2219">what differs into</text>
+<text x="742" y="104" font-size="13" fill="#2f2219">one verdict</text>
+<path d="M810 132 V152 H150" fill="none" stroke="#8a7258" stroke-width="1.5"/>
+<path d="M150 152 V167" stroke="#8a7258" stroke-width="1.5"/><path d="M145.5 165 L150 172 L154.5 165 Z" fill="#8a7258"/>
+<rect x="15" y="173" width="270" height="58" fill="#e6ecd2" stroke="#3d6b2c"/>
+<text x="150" y="199" text-anchor="middle" font-weight="bold" font-size="15" fill="#2f5a20">MATCHES SOURCE</text>
+<text x="150" y="217" text-anchor="middle" font-size="12.5" fill="#2f2219">exit code 0</text>
+<path d="M450 152 V167" stroke="#8a7258" stroke-width="1.5"/><path d="M445.5 165 L450 172 L454.5 165 Z" fill="#8a7258"/>
+<rect x="315" y="173" width="270" height="58" fill="#f5ddd0" stroke="#9b2c1f"/>
+<text x="450" y="199" text-anchor="middle" font-weight="bold" font-size="15" fill="#8f2317">DIFFERS FROM SOURCE</text>
+<text x="450" y="217" text-anchor="middle" font-size="12.5" fill="#2f2219">exit code 1: read the findings</text>
+<path d="M750 152 V167" stroke="#8a7258" stroke-width="1.5"/><path d="M745.5 165 L750 172 L754.5 165 Z" fill="#8a7258"/>
+<rect x="615" y="173" width="270" height="58" fill="#f6e5b4" stroke="#a67c1a"/>
+<text x="750" y="199" text-anchor="middle" font-weight="bold" font-size="15" fill="#6e4c00">COULD NOT VERIFY</text>
+<text x="750" y="217" text-anchor="middle" font-size="12.5" fill="#2f2219">exit code 2: never "safe"</text>
 </svg>

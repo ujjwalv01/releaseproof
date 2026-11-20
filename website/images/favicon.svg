@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
 <title>releaseproof</title>
-<path d="M16 2 L28 6.5 V15 C28 22.5 22.5 27.5 16 30 C9.5 27.5 4 22.5 4 15 V6.5 Z" fill="#3b5998"/>
-<path d="M10 16 L14.5 20.5 L22.5 11.5" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M16 2 L28 6.5 V15 C28 22.5 22.5 27.5 16 30 C9.5 27.5 4 22.5 4 15 V6.5 Z" fill="#6f3d17"/>
+<path d="M10 16 L14.5 20.5 L22.5 11.5" fill="none" stroke="#f9f2e4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

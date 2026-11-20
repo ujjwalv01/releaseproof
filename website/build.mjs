@@ -1,5 +1,5 @@
 // Builds the releaseproof website into website/dist: the Markdown in docs/, the root README,
-// CONTRIBUTING and SECURITY, and the CLI changelog, as a plain documentation site.
+// CONTRIBUTING and SECURITY, and the CLI changelog, styled like an old printed manual.
 //
 // The Markdown stays the single source. Nothing here repeats what the docs say, so the tests
 // that keep docs/ in sync with the code keep the site in sync too. Pages ship no JavaScript
@@ -279,9 +279,9 @@ export function renderPage({ page, body, site }) {
 <body>
 <a class="skip" href="#content">Skip to the content</a>
 <div class="page">
-<header class="site-header">
-<a class="brand" href="index.html"><img src="images/favicon.svg" width="40" height="40" alt=""><span class="brand-name">release<span>proof</span></span></a>
-<p class="header-links"><a href="${REPOSITORY}">GitHub</a> | <a href="https://www.npmjs.com/package/releaseproof">npm</a> | <a href="${SPONSOR_URL}">Sponsor</a></p>
+<header class="masthead">
+<a class="brand" href="index.html"><img src="images/favicon.svg" width="44" height="44" alt=""><span class="brand-name">releaseproof</span></a>
+<p class="tagline">Verify that an npm release matches its source before you trust it</p>
 </header>
 <nav class="menu" aria-label="Site">
 <ul>
@@ -295,7 +295,7 @@ ${body}
 </main>
 <aside class="sidebar" aria-label="About the project">
 <section class="box">
-<h2 class="caption">→ About</h2>
+<h2 class="caption">About</h2>
 <ul>
 <li>Version <a href="changelog.html">${escapeHtml(site.version)}</a></li>
 <li><a href="rules.html">${site.ruleCount} rules</a> with graded severity</li>
@@ -303,13 +303,13 @@ ${body}
 </ul>
 </section>
 <section class="box">
-<h2 class="caption">→ Links</h2>
+<h2 class="caption">Links</h2>
 <ul>
 ${PROJECT_LINKS.map((item) => `<li>${link(item)}</li>`).join("\n")}
 </ul>
 </section>
 <section class="box">
-<h2 class="caption">→ Support the project</h2>
+<h2 class="caption">Support the project</h2>
 <p>releaseproof is free and open source. Sponsoring pays for the time spent on it.</p>
 <p><a class="sponsor-button" href="${SPONSOR_URL}"><span aria-hidden="true">♥</span> Sponsor on GitHub</a></p>
 </section>
