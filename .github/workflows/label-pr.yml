@@ -1,0 +1,43 @@
+name: Label pull requests
+
+# Copies the labels of the issues a pull request closes onto it ("good first issue" becomes
+# "good first pr"; issue-only labels such as "help wanted" are skipped) and marks pull requests
+# whose author has no merged pull request here yet as "first-time contributor". Labels are only
+# ever added, never removed. The logic and its tests are in .github/scripts/label-pr.mjs.
+#
+# Why pull_request_target: a pull_request run for a fork only gets a read-only token, so it
+# could not add labels to most contributors' pull requests. pull_request_target is safe ONLY
+# because this job never checks out, builds or runs code from the pull request: the checkout
+# below takes the default branch, and only .github/scripts; the script reads numbers and logins
+# from the event and asks the GitHub API for the linked issues. It never reads the pull
+# request's title, body or files. Keep it that way: never add a checkout of the head ref, a
+# build step, or any use of the pull request's text to this workflow.
+on:
+  pull_request_target:
+    types: [opened, reopened, edited]
+
+permissions: {}
+
+concurrency:
+  group: label-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Add labels from the linked issues
+        run: node .github/scripts/label-pr.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

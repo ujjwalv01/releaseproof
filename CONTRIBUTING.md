@@ -160,7 +160,9 @@ Docker flags or the planner need a unit test and, when they affect real packages
 
    GitHub prints a link to open the pull request against `ujjwalv01/releaseproof:main`.
    In the description: what changed, why, how you tested it, and `Closes #<issue>` when
-   it resolves an issue. The template checklist is short; tick what applies.
+   it resolves an issue. A bot then copies that issue's labels onto the pull request (a
+   "good first issue" becomes "good first pr") and marks first pull requests with
+   "first-time contributor". The template checklist is short; tick what applies.
 
 9. **CI and review.** CI runs lint, typecheck, tests on Node 22 and 24, the packed
    manifest check and the Action self-test (a real rebuild of `sigstore@5.0.0` in
