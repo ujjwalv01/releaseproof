@@ -85,6 +85,17 @@ describe("renderMarkdown", () => {
     expect(html).toContain("<code>not-a-rule-table</code>");
     expect(html).toContain('<div class="table-wrap"><table>');
   });
+
+  it("labels every table cell with its column heading, for the phone layout", () => {
+    const html = renderMarkdown(
+      "| Package | `Exit` code | A & B |\n| --- | --- | --- |\n| x | 0 | y |",
+      "docs/x.md",
+    );
+    expect(html).toContain('<td data-label="Package">x</td>');
+    expect(html).toContain('<td data-label="Exit code">0</td>');
+    expect(html).toContain('<td data-label="A &#38; B">y</td>');
+    expect(html).toContain("<th>Package</th>");
+  });
 });
 
 describe("checkLinks", () => {
@@ -139,7 +150,7 @@ describe("build", () => {
 
   it("writes every page, the stylesheet and the images", () => {
     expect(result.pages).toEqual(PAGES.map((p) => p.output));
-    for (const file of [...result.pages, "style.css", "images/logo.svg", "images/sponsor.svg"]) {
+    for (const file of [...result.pages, "style.css", "images/favicon.svg"]) {
       expect(existsSync(path.join(outDir, file)), file).toBe(true);
     }
   });
@@ -161,18 +172,24 @@ describe("build", () => {
     }
   });
 
-  it("decorates the home page and links the sponsor page from every page", () => {
+  it("puts the diagram and the terminal picture into the home page only", () => {
     const home = page("index.html");
-    expect(home).toContain("images/under-construction.svg");
     expect(home.indexOf('id="what-releaseproof-does"')).toBeLessThan(home.indexOf("how-it-works"));
     expect(home.indexOf('id="usage"')).toBeLessThan(home.indexOf("images/terminal.svg"));
+    expect(page("faq.html")).not.toContain("images/terminal.svg");
+  });
+
+  it("links the sponsor page, the version and the rule count from every page", () => {
     for (const file of result.pages) {
-      expect(page(file)).toContain('href="https://github.com/sponsors/ujjwalv01"');
+      const html = page(file);
+      expect(html).toContain('href="https://github.com/sponsors/ujjwalv01"');
+      expect(html).toMatch(/Version <a href="changelog\.html">\d+\.\d+\.\d+/);
+      expect(html).toMatch(/<a href="rules\.html">\d+ rules<\/a>/);
     }
   });
 
   it("marks the current page in the menu and names the commit it was built from", () => {
-    expect(page("faq.html")).toContain('<a class="button" href="faq.html" aria-current="page">');
+    expect(page("faq.html")).toContain('<a href="faq.html" aria-current="page">');
     expect(page("faq.html")).toContain(`${REPOSITORY}/commit/${"a".repeat(40)}`);
   });
 });

@@ -1,5 +1,5 @@
 // Builds the releaseproof website into website/dist: the Markdown in docs/, the root README,
-// CONTRIBUTING and SECURITY, and the CLI changelog, framed as a 1990s home page.
+// CONTRIBUTING and SECURITY, and the CLI changelog, as a plain documentation site.
 //
 // The Markdown stays the single source. Nothing here repeats what the docs say, so the tests
 // that keep docs/ in sync with the code keep the site in sync too. Pages ship no JavaScript
@@ -37,19 +37,14 @@ export const PAGES = [
   {
     source: "docs/real-world-results.md",
     output: "real-world-results.html",
-    label: "Real-world results",
+    label: "Results",
   },
   { source: "docs/design-rebuild.md", output: "design-rebuild.html", label: "Design: rebuild" },
   { source: "docs/design-action.md", output: "design-action.html", label: "Design: Action" },
-  { source: "docs/spike-npm.md", output: "spike-npm.html", label: "Lab notes: npm" },
+  { source: "docs/spike-npm.md", output: "spike-npm.html", label: "npm notes" },
   { source: "CONTRIBUTING.md", output: "contributing.html", label: "Contributing" },
   { source: "SECURITY.md", output: "security.html", label: "Security" },
-  {
-    source: "packages/cli/CHANGELOG.md",
-    output: "changelog.html",
-    label: "What's new",
-    fresh: true,
-  },
+  { source: "packages/cli/CHANGELOG.md", output: "changelog.html", label: "What's new" },
 ];
 
 /** No scripts, no other hosts, no forms: the pages are documents and nothing else. */
@@ -148,7 +143,7 @@ export function rewriteHref(href, source, { pages = PAGES, root = ROOT } = {}) {
 
 /**
  * Markdown to HTML with GitHub's heading anchors, links rewritten for the site, tables in a
- * scrolling wrapper, and an anchor on every rule id in a rule table ("Id" in the first header
+ * scrolling wrapper with each cell labelled by its column, and an anchor on every rule id in a rule table ("Id" in the first header
  * cell), so `rules.html#dependency-added` points at its row.
  */
 export function renderMarkdown(markdown, source, options = {}) {
@@ -158,6 +153,16 @@ export function renderMarkdown(markdown, source, options = {}) {
     walkTokens(token) {
       if (token.type === "link") {
         token.href = rewriteHref(token.href, source, options);
+      }
+      if (token.type === "table") {
+        // Each cell carries its column's heading: on phones a row is shown as a card, with
+        // the heading in front of every value (see style.css).
+        const labels = token.header.map((cell) => plainText(cell.tokens));
+        for (const row of token.rows) {
+          row.forEach((cell, column) => {
+            cell.label = labels[column] ?? "";
+          });
+        }
       }
       if (token.type === "table" && plainText(token.header[0]?.tokens ?? []) === "Id") {
         for (const row of token.rows) {
@@ -173,6 +178,12 @@ export function renderMarkdown(markdown, source, options = {}) {
       heading({ tokens, depth }) {
         const id = escapeHtml(slug(plainText(tokens)));
         return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`;
+      },
+      tablecell(token) {
+        const tag = token.header ? "th" : "td";
+        const align = token.align ? ` align="${token.align}"` : "";
+        const label = token.header ? "" : ` data-label="${escapeHtml(token.label ?? "")}"`;
+        return `<${tag}${align}${label}>${this.parser.parseInline(token.tokens)}</${tag}>\n`;
       },
       codespan(token) {
         // Rule ids match RULE_ID, so they need no escaping.
@@ -196,47 +207,38 @@ function afterHeading(html, id, snippet) {
 
 const HOW_IT_WORKS = `<figure class="diagram">
 <picture>
-<source media="(min-width: 900px)" srcset="images/how-it-works-wide.svg" width="840" height="290">
-<img src="images/how-it-works.svg" width="380" height="768" alt="How it works: 1. fetch the tarball and its attestations from the npm registry; 2. verify the provenance against the Sigstore trust root; 3. rebuild from the certified commit in Docker, with no network for the build step; 4. compare the release and the rebuild file by file; 5. graded rules decide: MATCHES SOURCE (exit 0), DIFFERS FROM SOURCE (exit 1) or COULD NOT VERIFY (exit 2, never safe).">
+<source media="(min-width: 700px)" srcset="images/how-it-works-wide.svg" width="900" height="242">
+<img src="images/how-it-works.svg" width="360" height="742" alt="How it works: 1. fetch the tarball and its attestations from the npm registry; 2. verify the provenance against the Sigstore trust root; 3. rebuild from the certified commit in Docker, with no network for the build step; 4. compare the release and the rebuild file by file; 5. graded rules decide: MATCHES SOURCE (exit code 0), DIFFERS FROM SOURCE (exit code 1) or COULD NOT VERIFY (exit code 2, never safe).">
 </picture>
 <figcaption>How a check works, step by step</figcaption>
 </figure>
 `;
 
+// Hidden on narrow screens by the stylesheet: the text would be too small to read there,
+// and the README shows the same report as text right below.
 const TERMINAL = `<figure class="terminal">
-<img src="images/terminal.svg" width="800" height="400" alt="A terminal running npx releaseproof check sigstore@5.0.0: provenance VERIFIED, rebuild OK, 9 files identical, verdict MATCHES SOURCE.">
-<figcaption>What a check looks like (the sigstore@5.0.0 example below)</figcaption>
+<img src="images/terminal.svg" width="800" height="346" alt="A terminal running npx releaseproof check sigstore@5.0.0: provenance VERIFIED, rebuild OK, 9 files identical, verdict MATCHES SOURCE.">
+<figcaption>A check of sigstore@5.0.0, with its progress lines</figcaption>
 </figure>
 `;
 
-/** The home page gets the banner, the diagram and the terminal around the README. */
+/** The home page gets the diagram and the terminal picture inside the README. */
 function decorateHome(body) {
-  const welcome = `<p class="construction"><img src="images/under-construction.svg" width="468" height="60" alt="Under construction: these pages grow with the project"></p>
-<p class="welcome">Welcome to the releaseproof home page! <img src="images/new.svg" width="44" height="22" alt="New!"></p>
-`;
-  return (
-    welcome +
-    afterHeading(afterHeading(body, "what-releaseproof-does", HOW_IT_WORKS), "usage", TERMINAL)
+  return afterHeading(
+    afterHeading(body, "what-releaseproof-does", HOW_IT_WORKS),
+    "usage",
+    TERMINAL,
   );
 }
 
-const BADGES = [
-  ["badge-any-browser.svg", "Best viewed with any browser"],
-  ["badge-no-telemetry.svg", "No telemetry"],
-  ["badge-zero-js.svg", "This site uses 0 KB of JavaScript"],
-  ["badge-fails-closed.svg", "Fails closed"],
-  ["badge-deterministic.svg", "100% deterministic"],
-  ["badge-mit.svg", "MIT licensed"],
-];
-
-const WEB_LINKS = [
+const PROJECT_LINKS = [
   [REPOSITORY, "Source code on GitHub"],
   ["https://www.npmjs.com/package/releaseproof", "releaseproof on npm"],
   ["https://github.com/marketplace/actions/releaseproof-check", "GitHub Action"],
-  [`${REPOSITORY}/issues/new/choose`, "Write to the webmaster (open an issue)"],
+  [`${REPOSITORY}/issues`, "Report a problem"],
 ];
 
-const COOL_LINKS = [
+const RELATED_LINKS = [
   ["https://www.sigstore.dev/", "Sigstore"],
   ["https://docs.npmjs.com/generating-provenance-statements", "npm provenance"],
   ["https://slsa.dev/", "SLSA"],
@@ -247,7 +249,7 @@ function link([href, text]) {
   return `<a href="${href}">${escapeHtml(text)}</a>`;
 }
 
-/** One page of the site: the 90s frame around the rendered Markdown. */
+/** One page of the site: header, menu, the rendered Markdown and a sidebar of boxes. */
 export function renderPage({ page, body, site }) {
   const isHome = page.output === "index.html";
   const title = isHome ? "releaseproof · Home" : `${page.label} · releaseproof`;
@@ -257,20 +259,9 @@ export function renderPage({ page, body, site }) {
   const menu = site.pages
     .map((item) => {
       const current = item === page ? ' aria-current="page"' : "";
-      const fresh = item.fresh
-        ? ' <img class="new" src="images/new.svg" width="36" height="18" alt="new">'
-        : "";
-      return `<li><a class="button" href="${item.output}"${current}>${escapeHtml(item.label)}${fresh}</a></li>`;
+      return `<li><a href="${item.output}"${current}>${escapeHtml(item.label)}</a></li>`;
     })
     .join("\n");
-  const marquee = [
-    `NEW! releaseproof ${site.version} is out`,
-    `${site.ruleCount} rules on duty`,
-    "rebuilds in Docker, with no network for the build step",
-    "no telemetry, no account, no API key",
-    '"could not verify" is never "safe"',
-  ].join(" ★ ");
-  const drive = `C:\\RELEASEPROOF\\${page.source.replaceAll("/", "\\").toUpperCase()}`;
   const built = site.commit
     ? ` · built from <a href="${REPOSITORY}/commit/${site.commit}">${site.commit.slice(0, 7)}</a>`
     : "";
@@ -287,43 +278,48 @@ export function renderPage({ page, body, site }) {
 </head>
 <body>
 <a class="skip" href="#content">Skip to the content</a>
-<header class="masthead">
-<a href="index.html"><img class="logo" src="images/logo.svg" width="560" height="120" alt="releaseproof home"></a>
-<p class="tagline">Verify that an npm release matches its source before you trust it</p>
-<div class="marquee"><p>★ ${escapeHtml(marquee)} ★</p></div>
+<div class="page">
+<header class="site-header">
+<a class="brand" href="index.html"><img src="images/favicon.svg" width="40" height="40" alt=""><span class="brand-name">release<span>proof</span></span></a>
+<p class="header-links"><a href="${REPOSITORY}">GitHub</a> | <a href="https://www.npmjs.com/package/releaseproof">npm</a> | <a href="${SPONSOR_URL}">Sponsor</a></p>
 </header>
-<div class="layout">
-<nav class="sidebar panel" aria-label="Site">
-<p class="nav-title">~*~ Pages ~*~</p>
-<ul class="menu">
+<nav class="menu" aria-label="Site">
+<ul>
 ${menu}
 </ul>
 </nav>
-<aside class="extras panel" aria-label="Links and sponsor">
-<p class="nav-title"><img src="images/globe.svg" width="24" height="24" alt=""> On the Web</p>
-<ul class="web-links">
-${WEB_LINKS.map((item) => `<li>${link(item)}</li>`).join("\n")}
-</ul>
-<p class="sponsor"><a href="${SPONSOR_URL}"><img src="images/sponsor.svg" width="160" height="60" alt="Sponsor releaseproof on GitHub Sponsors"></a></p>
-<p class="counter">Rules on duty<br><span class="digits">${String(site.ruleCount).padStart(6, "0")}</span></p>
-<p class="badges">
-${BADGES.map(([file, alt]) => `<img src="images/${file}" width="88" height="31" alt="${escapeHtml(alt)}">`).join("\n")}
-</p>
-</aside>
-<main id="content" class="window" tabindex="-1">
-<div class="titlebar"><span class="path">${escapeHtml(drive)}</span><span class="controls" aria-hidden="true"><span>_</span><span>□</span><span>×</span></span></div>
-<article class="window-body">
+<div class="layout">
+<main id="content" class="box content" tabindex="-1">
 ${body}
 <p class="edit-link"><a href="${REPOSITORY}/edit/main/${page.source}">Edit this page on GitHub</a></p>
-</article>
 </main>
+<aside class="sidebar" aria-label="About the project">
+<section class="box">
+<h2 class="caption">→ About</h2>
+<ul>
+<li>Version <a href="changelog.html">${escapeHtml(site.version)}</a></li>
+<li><a href="rules.html">${site.ruleCount} rules</a> with graded severity</li>
+<li>MIT licensed, no telemetry</li>
+</ul>
+</section>
+<section class="box">
+<h2 class="caption">→ Links</h2>
+<ul>
+${PROJECT_LINKS.map((item) => `<li>${link(item)}</li>`).join("\n")}
+</ul>
+</section>
+<section class="box">
+<h2 class="caption">→ Support the project</h2>
+<p>releaseproof is free and open source. Sponsoring pays for the time spent on it.</p>
+<p><a class="sponsor-button" href="${SPONSOR_URL}"><span aria-hidden="true">♥</span> Sponsor on GitHub</a></p>
+</section>
+</aside>
 </div>
 <footer class="site-footer">
-<hr>
-<p class="sponsor-line">Like releaseproof? <a href="${SPONSOR_URL}">Sponsor its development</a> and keep the rebuilds coming.</p>
-<p><strong>Cool links:</strong> ${COOL_LINKS.map(link).join(" · ")}</p>
-<p>releaseproof ${escapeHtml(site.version)} · MIT licensed${built} · Best viewed with any browser at any resolution.<br>This site uses 0 bytes of JavaScript and loads nothing from other hosts.</p>
+<p>Related: ${RELATED_LINKS.map(link).join(" · ")}</p>
+<p>releaseproof ${escapeHtml(site.version)} · MIT licensed${built}</p>
 </footer>
+</div>
 </body>
 </html>
 `;

@@ -1,70 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="380" height="768" viewBox="0 0 380 768" role="img" aria-label="How a releaseproof check works">
-<defs><linearGradient id="title" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000080"/><stop offset="1" stop-color="#1084d0"/></linearGradient></defs>
-<rect x="20" y="14" width="340" height="88" fill="#c0c0c0"/>
-<path d="M21 101V15H359" fill="none" stroke="#ffffff" stroke-width="2"/>
-<path d="M359 15V101H21" fill="none" stroke="#000000" stroke-width="2"/>
-<path d="M357 17V99H23" fill="none" stroke="#808080" stroke-width="1"/>
-<rect x="24" y="18" width="332" height="24" fill="url(#title)"/>
-<text x="30" y="35" font-family="Tahoma, Verdana, 'Segoe UI', sans-serif" font-weight="bold" font-size="14" fill="#ffffff">1. FETCH</text>
-<g font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="13" fill="#000000" text-anchor="middle">
-<text x="190" y="60">the tarball and its attestations</text>
-<text x="190" y="79">from the npm registry</text>
-</g>
-<polygon points="184,104 196,104 196,120 202,120 190,130 178,120 184,120" fill="#ff0000" stroke="#000000" stroke-width="1"/>
-<rect x="20" y="132" width="340" height="88" fill="#c0c0c0"/>
-<path d="M21 219V133H359" fill="none" stroke="#ffffff" stroke-width="2"/>
-<path d="M359 133V219H21" fill="none" stroke="#000000" stroke-width="2"/>
-<path d="M357 135V217H23" fill="none" stroke="#808080" stroke-width="1"/>
-<rect x="24" y="136" width="332" height="24" fill="url(#title)"/>
-<text x="30" y="153" font-family="Tahoma, Verdana, 'Segoe UI', sans-serif" font-weight="bold" font-size="14" fill="#ffffff">2. VERIFY</text>
-<g font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="13" fill="#000000" text-anchor="middle">
-<text x="190" y="178">the provenance against the</text>
-<text x="190" y="197">Sigstore trust root</text>
-</g>
-<polygon points="184,222 196,222 196,238 202,238 190,248 178,238 184,238" fill="#ff0000" stroke="#000000" stroke-width="1"/>
-<rect x="20" y="250" width="340" height="88" fill="#c0c0c0"/>
-<path d="M21 337V251H359" fill="none" stroke="#ffffff" stroke-width="2"/>
-<path d="M359 251V337H21" fill="none" stroke="#000000" stroke-width="2"/>
-<path d="M357 253V335H23" fill="none" stroke="#808080" stroke-width="1"/>
-<rect x="24" y="254" width="332" height="24" fill="url(#title)"/>
-<text x="30" y="271" font-family="Tahoma, Verdana, 'Segoe UI', sans-serif" font-weight="bold" font-size="14" fill="#ffffff">3. REBUILD</text>
-<g font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="13" fill="#000000" text-anchor="middle">
-<text x="190" y="296">from the certified commit in Docker;</text>
-<text x="190" y="315">the build step has no network</text>
-</g>
-<polygon points="184,340 196,340 196,356 202,356 190,366 178,356 184,356" fill="#ff0000" stroke="#000000" stroke-width="1"/>
-<rect x="20" y="368" width="340" height="88" fill="#c0c0c0"/>
-<path d="M21 455V369H359" fill="none" stroke="#ffffff" stroke-width="2"/>
-<path d="M359 369V455H21" fill="none" stroke="#000000" stroke-width="2"/>
-<path d="M357 371V453H23" fill="none" stroke="#808080" stroke-width="1"/>
-<rect x="24" y="372" width="332" height="24" fill="url(#title)"/>
-<text x="30" y="389" font-family="Tahoma, Verdana, 'Segoe UI', sans-serif" font-weight="bold" font-size="14" fill="#ffffff">4. COMPARE</text>
-<g font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="13" fill="#000000" text-anchor="middle">
-<text x="190" y="414">the release and the rebuild,</text>
-<text x="190" y="433">file by file</text>
-</g>
-<polygon points="184,458 196,458 196,474 202,474 190,484 178,474 184,474" fill="#ff0000" stroke="#000000" stroke-width="1"/>
-<rect x="20" y="486" width="340" height="88" fill="#c0c0c0"/>
-<path d="M21 573V487H359" fill="none" stroke="#ffffff" stroke-width="2"/>
-<path d="M359 487V573H21" fill="none" stroke="#000000" stroke-width="2"/>
-<path d="M357 489V571H23" fill="none" stroke="#808080" stroke-width="1"/>
-<rect x="24" y="490" width="332" height="24" fill="url(#title)"/>
-<text x="30" y="507" font-family="Tahoma, Verdana, 'Segoe UI', sans-serif" font-weight="bold" font-size="14" fill="#ffffff">5. DECIDE</text>
-<g font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="13" fill="#000000" text-anchor="middle">
-<text x="190" y="532">graded rules turn what differs</text>
-<text x="190" y="551">into one verdict</text>
-</g>
-<polygon points="184,576 196,576 196,588 202,588 190,598 178,588 184,588" fill="#ff0000" stroke="#000000" stroke-width="1"/>
-<rect x="20" y="600" width="340" height="48" rx="10" fill="#008000" stroke="#000000" stroke-width="2"/>
-<rect x="24" y="603" width="332" height="20" rx="8" fill="#ffffff" opacity="0.18"/>
-<text x="190" y="622" font-family="'Arial Black', Impact, 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="15" fill="#ffffff" text-anchor="middle">MATCHES SOURCE</text>
-<text x="190" y="638" font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="11.5" fill="#ffffff" text-anchor="middle">exit 0</text>
-<rect x="20" y="656" width="340" height="48" rx="10" fill="#c00000" stroke="#000000" stroke-width="2"/>
-<rect x="24" y="659" width="332" height="20" rx="8" fill="#ffffff" opacity="0.18"/>
-<text x="190" y="678" font-family="'Arial Black', Impact, 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="15" fill="#ffffff" text-anchor="middle">DIFFERS FROM SOURCE</text>
-<text x="190" y="694" font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="11.5" fill="#ffffff" text-anchor="middle">exit 1 · read the findings</text>
-<rect x="20" y="712" width="340" height="48" rx="10" fill="#ffcc00" stroke="#000000" stroke-width="2"/>
-<rect x="24" y="715" width="332" height="20" rx="8" fill="#ffffff" opacity="0.18"/>
-<text x="190" y="734" font-family="'Arial Black', Impact, 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="15" fill="#000000" text-anchor="middle">COULD NOT VERIFY</text>
-<text x="190" y="750" font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="11.5" fill="#000000" text-anchor="middle">exit 2 · never "safe"</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="742" viewBox="0 0 360 742" role="img" aria-label="How a releaseproof check works" font-family="Arial, Helvetica, sans-serif">
+<rect x="10" y="10" width="340" height="84" rx="5" fill="#ffffff" stroke="#b9b9b9"/>
+<text x="22" y="35" font-weight="bold" font-size="15" fill="#3b5998">1. Fetch</text>
+<path d="M11 46.5 H349" stroke="#e1e1e1"/>
+<text x="22" y="68" font-size="13" fill="#222222">the tarball and its attestations</text>
+<text x="22" y="86" font-size="13" fill="#222222">from the npm registry</text>
+<path d="M180 96 V111" stroke="#8a8a8a" stroke-width="1.5"/><path d="M175.5 109 L180 116 L184.5 109 Z" fill="#8a8a8a"/>
+<rect x="10" y="118" width="340" height="84" rx="5" fill="#ffffff" stroke="#b9b9b9"/>
+<text x="22" y="143" font-weight="bold" font-size="15" fill="#3b5998">2. Verify</text>
+<path d="M11 154.5 H349" stroke="#e1e1e1"/>
+<text x="22" y="176" font-size="13" fill="#222222">the provenance against the</text>
+<text x="22" y="194" font-size="13" fill="#222222">Sigstore trust root</text>
+<path d="M180 204 V219" stroke="#8a8a8a" stroke-width="1.5"/><path d="M175.5 217 L180 224 L184.5 217 Z" fill="#8a8a8a"/>
+<rect x="10" y="226" width="340" height="84" rx="5" fill="#ffffff" stroke="#b9b9b9"/>
+<text x="22" y="251" font-weight="bold" font-size="15" fill="#3b5998">3. Rebuild</text>
+<path d="M11 262.5 H349" stroke="#e1e1e1"/>
+<text x="22" y="284" font-size="13" fill="#222222">from the certified commit in Docker;</text>
+<text x="22" y="302" font-size="13" fill="#222222">the build step has no network</text>
+<path d="M180 312 V327" stroke="#8a8a8a" stroke-width="1.5"/><path d="M175.5 325 L180 332 L184.5 325 Z" fill="#8a8a8a"/>
+<rect x="10" y="334" width="340" height="84" rx="5" fill="#ffffff" stroke="#b9b9b9"/>
+<text x="22" y="359" font-weight="bold" font-size="15" fill="#3b5998">4. Compare</text>
+<path d="M11 370.5 H349" stroke="#e1e1e1"/>
+<text x="22" y="392" font-size="13" fill="#222222">the release and the rebuild,</text>
+<text x="22" y="410" font-size="13" fill="#222222">file by file</text>
+<path d="M180 420 V435" stroke="#8a8a8a" stroke-width="1.5"/><path d="M175.5 433 L180 440 L184.5 433 Z" fill="#8a8a8a"/>
+<rect x="10" y="442" width="340" height="84" rx="5" fill="#ffffff" stroke="#b9b9b9"/>
+<text x="22" y="467" font-weight="bold" font-size="15" fill="#3b5998">5. Decide</text>
+<path d="M11 478.5 H349" stroke="#e1e1e1"/>
+<text x="22" y="500" font-size="13" fill="#222222">graded rules turn what differs</text>
+<text x="22" y="518" font-size="13" fill="#222222">into one verdict</text>
+<path d="M180 528 V543" stroke="#8a8a8a" stroke-width="1.5"/><path d="M175.5 541 L180 548 L184.5 541 Z" fill="#8a8a8a"/>
+<rect x="10" y="550" width="340" height="54" rx="5" fill="#eaf6ec" stroke="#1a7f37"/>
+<text x="180" y="574" text-anchor="middle" font-weight="bold" font-size="15" fill="#1a7f37">MATCHES SOURCE</text>
+<text x="180" y="592" text-anchor="middle" font-size="12.5" fill="#222222">exit code 0</text>
+<rect x="10" y="614" width="340" height="54" rx="5" fill="#fdecea" stroke="#c62828"/>
+<text x="180" y="638" text-anchor="middle" font-weight="bold" font-size="15" fill="#c62828">DIFFERS FROM SOURCE</text>
+<text x="180" y="656" text-anchor="middle" font-size="12.5" fill="#222222">exit code 1: read the findings</text>
+<rect x="10" y="678" width="340" height="54" rx="5" fill="#fff6da" stroke="#b88a00"/>
+<text x="180" y="702" text-anchor="middle" font-weight="bold" font-size="15" fill="#7a5a00">COULD NOT VERIFY</text>
+<text x="180" y="720" text-anchor="middle" font-size="12.5" fill="#222222">exit code 2: never "safe"</text>
 </svg>
