@@ -1,0 +1,554 @@
+/* releaseproof: best viewed with any browser, at any resolution. */
+
+:root {
+  --silver: #c0c0c0;
+  --light: #ffffff;
+  --shade: #808080;
+  --dark: #000000;
+  --navy: #000080;
+  --sky: #1084d0;
+  --paper: #ffffff;
+  --ink: #000000;
+  --link: #0000ee;
+  --visited: #551a8b;
+  --hot: #ff0000;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #000033 url("images/stars.svg") repeat;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  color: var(--ink);
+  font:
+    18px / 1.55 "Times New Roman",
+    Times,
+    serif;
+  min-height: 100vh;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--link);
+}
+
+a:visited {
+  color: var(--visited);
+}
+
+a:hover {
+  color: var(--hot);
+}
+
+a:focus-visible,
+.window:focus-visible {
+  outline: 2px dotted var(--ink);
+  outline-offset: 2px;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  background: #ffff00;
+  color: var(--ink);
+  padding: 4px 8px;
+  z-index: 1;
+}
+
+.skip:focus {
+  left: 16px;
+}
+
+/* Win95 bevels */
+.panel,
+.window,
+.button,
+.controls span {
+  border: 2px solid;
+  border-color: var(--light) var(--dark) var(--dark) var(--light);
+  box-shadow:
+    inset -1px -1px var(--shade),
+    inset 1px 1px #dfdfdf;
+}
+
+/* Masthead */
+.masthead {
+  max-width: 1180px;
+  margin: 0 auto 16px;
+  text-align: center;
+}
+
+.logo {
+  display: block;
+  margin: 0 auto;
+}
+
+.tagline {
+  margin: 4px 0 12px;
+  color: #ffff00;
+  font:
+    bold 20px / 1.3 "Comic Sans MS",
+    "Comic Neue",
+    "Chalkboard SE",
+    cursive;
+  text-shadow: 2px 2px 0 #ff00ff;
+}
+
+.marquee {
+  overflow: hidden;
+  background: var(--dark);
+  border: 3px inset var(--silver);
+  color: #00ff00;
+  font:
+    bold 16px / 1.4 "Courier New",
+    Courier,
+    monospace;
+  text-align: left;
+}
+
+.marquee p {
+  display: inline-block;
+  margin: 0;
+  padding: 4px 0 4px 100%;
+  white-space: nowrap;
+  animation: marquee 40s linear infinite;
+  /* Start a quarter of the way in, so the text is on screen when the page opens. */
+  animation-delay: -10s;
+}
+
+.marquee:hover p {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* Layout */
+.layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "nav main"
+    "extras main";
+  gap: 16px;
+  max-width: 1180px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.sidebar {
+  grid-area: nav;
+}
+
+.extras {
+  grid-area: extras;
+}
+
+.sidebar,
+.extras {
+  background: var(--silver);
+  padding: 10px;
+  font:
+    14px / 1.4 Tahoma,
+    Verdana,
+    "Segoe UI",
+    sans-serif;
+}
+
+.nav-title {
+  margin: 4px 0 8px;
+  color: var(--navy);
+  font-weight: bold;
+  text-align: center;
+}
+
+.nav-title img {
+  vertical-align: middle;
+}
+
+.menu,
+.web-links {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+
+.web-links li {
+  margin: 0 0 6px 18px;
+  list-style: square;
+}
+
+.menu li + li {
+  margin-top: 4px;
+}
+
+.button {
+  display: block;
+  padding: 5px 8px;
+  background: var(--silver);
+  color: var(--ink);
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.button:visited {
+  color: var(--ink);
+}
+
+.button:hover {
+  background: #d4d0c8;
+  color: var(--navy);
+}
+
+.button:active,
+.button[aria-current="page"] {
+  border-color: var(--dark) var(--light) var(--light) var(--dark);
+  box-shadow:
+    inset 1px 1px var(--shade),
+    inset -1px -1px #dfdfdf;
+  background: #a8a8a8;
+}
+
+.button .new {
+  vertical-align: middle;
+}
+
+.sponsor {
+  margin: 0 0 14px;
+  text-align: center;
+}
+
+.sponsor img {
+  display: block;
+  margin: 0 auto;
+}
+
+.counter {
+  margin: 0 0 14px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.digits {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 6px;
+  background: var(--dark);
+  border: 2px inset var(--silver);
+  color: #00ff00;
+  font:
+    bold 20px "Courier New",
+    Courier,
+    monospace;
+  letter-spacing: 3px;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+}
+
+/* The content window */
+.window {
+  grid-area: main;
+  background: var(--silver);
+  padding: 3px;
+  min-width: 0;
+}
+
+.titlebar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px 3px 8px;
+  background: linear-gradient(90deg, var(--navy), var(--sky));
+  color: var(--light);
+  font:
+    bold 14px / 1.3 Tahoma,
+    Verdana,
+    "Segoe UI",
+    sans-serif;
+}
+
+.titlebar .path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controls {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+.controls span {
+  display: inline-block;
+  width: 20px;
+  height: 18px;
+  background: var(--silver);
+  color: var(--ink);
+  font:
+    bold 12px / 14px Tahoma,
+    Verdana,
+    sans-serif;
+  text-align: center;
+}
+
+.window-body {
+  margin-top: 3px;
+  padding: 8px 24px 16px;
+  background: var(--paper);
+  border: 2px inset var(--silver);
+}
+
+.window-body h1 {
+  color: #800000;
+  font:
+    900 34px / 1.2 "Arial Black",
+    Impact,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  text-shadow: 2px 2px 0 var(--silver);
+}
+
+.window-body h2 {
+  clear: both;
+  margin-top: 1.8em;
+  padding-bottom: 2px;
+  border-bottom: 4px ridge var(--silver);
+  color: var(--navy);
+  font:
+    bold 26px / 1.25 Arial,
+    Helvetica,
+    sans-serif;
+}
+
+.window-body h3 {
+  color: #008080;
+  font:
+    bold 20px / 1.3 Arial,
+    Helvetica,
+    sans-serif;
+}
+
+.window-body h4 {
+  color: #800080;
+}
+
+:target {
+  background: #ffff00;
+  outline: 2px dashed var(--hot);
+}
+
+code {
+  padding: 0 3px;
+  background: #ffffcc;
+  color: #800000;
+  font:
+    0.9em "Courier New",
+    Courier,
+    monospace;
+}
+
+pre {
+  overflow-x: auto;
+  padding: 12px 14px;
+  background: var(--dark);
+  border: 3px inset var(--silver);
+  color: #33ff33;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+/* Rule ids in the rule tables: keep each one on a single line. */
+code[id] {
+  white-space: nowrap;
+}
+
+pre code {
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+blockquote {
+  margin: 1em 0;
+  padding: 4px 14px;
+  background: #ffffe0;
+  border: 2px dashed var(--hot);
+}
+
+hr {
+  height: 6px;
+  margin: 24px 0;
+  border: 0;
+  background: linear-gradient(90deg, #ff0000, #ff9900, #ffee00, #00cc00, #0099ff, #9933ff);
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+table {
+  border: 2px outset var(--silver);
+  border-spacing: 2px;
+  font-size: 16px;
+}
+
+th,
+td {
+  padding: 4px 8px;
+  border: 1px inset var(--silver);
+  vertical-align: top;
+  text-align: left;
+}
+
+th {
+  background: var(--navy);
+  color: var(--light);
+}
+
+tr:nth-child(even) td {
+  background: #f0f0f0;
+}
+
+.edit-link {
+  margin-top: 2.5em;
+  font-size: 15px;
+  text-align: right;
+}
+
+/* Home page extras */
+.construction {
+  margin: 12px 0 0;
+  text-align: center;
+}
+
+.welcome {
+  margin: 8px 0 0;
+  color: #ff00ff;
+  font:
+    bold 22px / 1.3 "Comic Sans MS",
+    "Comic Neue",
+    "Chalkboard SE",
+    cursive;
+  text-align: center;
+}
+
+.welcome img {
+  vertical-align: middle;
+}
+
+figure {
+  margin: 1em 0;
+  text-align: center;
+}
+
+figcaption {
+  font-style: italic;
+  font-size: 15px;
+}
+
+/* Footer */
+.site-footer {
+  max-width: 1180px;
+  margin: 16px auto 0;
+  color: var(--light);
+  font:
+    15px / 1.5 Verdana,
+    Tahoma,
+    sans-serif;
+  text-align: center;
+}
+
+.site-footer a {
+  color: #00ffff;
+}
+
+.site-footer a:visited {
+  color: #ff99ff;
+}
+
+.site-footer a:hover {
+  color: #ffff00;
+}
+
+.sponsor-line {
+  color: #ffff00;
+  font:
+    bold 17px / 1.4 "Comic Sans MS",
+    "Comic Neue",
+    "Chalkboard SE",
+    cursive;
+}
+
+/* Phones and narrow windows */
+@media (max-width: 760px) {
+  body {
+    font-size: 17px;
+  }
+
+  /* Phones: the menu, then the page, then the links and buttons. */
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-template-areas:
+      "nav"
+      "main"
+      "extras";
+  }
+
+  .menu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .menu li + li {
+    margin-top: 0;
+  }
+
+  .window-body {
+    padding: 8px 12px 12px;
+  }
+
+  .window-body h1 {
+    font-size: 28px;
+  }
+
+  .window-body h2 {
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee p {
+    padding-left: 8px;
+    white-space: normal;
+    animation: none;
+  }
+}

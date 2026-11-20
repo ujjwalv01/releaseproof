@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - action
+  - website
 
 # One place for runtime dependency versions shared by core and the CLI.
 catalog:

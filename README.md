@@ -2,7 +2,10 @@
 
 **Verify every npm release matches its source before you approve it.**
 
-> Early release (0.1.x). The verdicts are deterministic and fail closed, but expect rough
+Documentation website: [ujjwalv01.github.io/releaseproof](https://ujjwalv01.github.io/releaseproof/)
+· [Sponsor the project](https://github.com/sponsors/ujjwalv01)
+
+> Early release (0.x). The verdicts are deterministic and fail closed, but expect rough
 > edges; please [report](https://github.com/ujjwalv01/releaseproof/issues) packages it
 > cannot rebuild.
 

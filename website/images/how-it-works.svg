@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="380" height="768" viewBox="0 0 380 768" role="img" aria-label="How a releaseproof check works">
+<defs><linearGradient id="title" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000080"/><stop offset="1" stop-color="#1084d0"/></linearGradient></defs>
+<rect x="20" y="14" width="340" height="88" fill="#c0c0c0"/>
+<path d="M21 101V15H359" fill="none" stroke="#ffffff" stroke-width="2"/>
+<path d="M359 15V101H21" fill="none" stroke="#000000" stroke-width="2"/>
+<path d="M357 17V99H23" fill="none" stroke="#808080" stroke-width="1"/>
+<rect x="24" y="18" width="332" height="24" fill="url(#title)"/>
+<text x="30" y="35" font-family="Tahoma, Verdana, 'Segoe UI', sans-serif" font-weight="bold" font-size="14" fill="#ffffff">1. FETCH</text>
+<g font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="13" fill="#000000" text-anchor="middle">
+<text x="190" y="60">the tarball and its attestations</text>
+<text x="190" y="79">from the npm registry</text>
+</g>
+<polygon points="184,104 196,104 196,120 202,120 190,130 178,120 184,120" fill="#ff0000" stroke="#000000" stroke-width="1"/>
+<rect x="20" y="132" width="340" height="88" fill="#c0c0c0"/>
+<path d="M21 219V133H359" fill="none" stroke="#ffffff" stroke-width="2"/>
+<path d="M359 133V219H21" fill="none" stroke="#000000" stroke-width="2"/>
+<path d="M357 135V217H23" fill="none" stroke="#808080" stroke-width="1"/>
+<rect x="24" y="136" width="332" height="24" fill="url(#title)"/>
+<text x="30" y="153" font-family="Tahoma, Verdana, 'Segoe UI', sans-serif" font-weight="bold" font-size="14" fill="#ffffff">2. VERIFY</text>
+<g font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="13" fill="#000000" text-anchor="middle">
+<text x="190" y="178">the provenance against the</text>
+<text x="190" y="197">Sigstore trust root</text>
+</g>
+<polygon points="184,222 196,222 196,238 202,238 190,248 178,238 184,238" fill="#ff0000" stroke="#000000" stroke-width="1"/>
+<rect x="20" y="250" width="340" height="88" fill="#c0c0c0"/>
+<path d="M21 337V251H359" fill="none" stroke="#ffffff" stroke-width="2"/>
+<path d="M359 251V337H21" fill="none" stroke="#000000" stroke-width="2"/>
+<path d="M357 253V335H23" fill="none" stroke="#808080" stroke-width="1"/>
+<rect x="24" y="254" width="332" height="24" fill="url(#title)"/>
+<text x="30" y="271" font-family="Tahoma, Verdana, 'Segoe UI', sans-serif" font-weight="bold" font-size="14" fill="#ffffff">3. REBUILD</text>
+<g font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="13" fill="#000000" text-anchor="middle">
+<text x="190" y="296">from the certified commit in Docker;</text>
+<text x="190" y="315">the build step has no network</text>
+</g>
+<polygon points="184,340 196,340 196,356 202,356 190,366 178,356 184,356" fill="#ff0000" stroke="#000000" stroke-width="1"/>
+<rect x="20" y="368" width="340" height="88" fill="#c0c0c0"/>
+<path d="M21 455V369H359" fill="none" stroke="#ffffff" stroke-width="2"/>
+<path d="M359 369V455H21" fill="none" stroke="#000000" stroke-width="2"/>
+<path d="M357 371V453H23" fill="none" stroke="#808080" stroke-width="1"/>
+<rect x="24" y="372" width="332" height="24" fill="url(#title)"/>
+<text x="30" y="389" font-family="Tahoma, Verdana, 'Segoe UI', sans-serif" font-weight="bold" font-size="14" fill="#ffffff">4. COMPARE</text>
+<g font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="13" fill="#000000" text-anchor="middle">
+<text x="190" y="414">the release and the rebuild,</text>
+<text x="190" y="433">file by file</text>
+</g>
+<polygon points="184,458 196,458 196,474 202,474 190,484 178,474 184,474" fill="#ff0000" stroke="#000000" stroke-width="1"/>
+<rect x="20" y="486" width="340" height="88" fill="#c0c0c0"/>
+<path d="M21 573V487H359" fill="none" stroke="#ffffff" stroke-width="2"/>
+<path d="M359 487V573H21" fill="none" stroke="#000000" stroke-width="2"/>
+<path d="M357 489V571H23" fill="none" stroke="#808080" stroke-width="1"/>
+<rect x="24" y="490" width="332" height="24" fill="url(#title)"/>
+<text x="30" y="507" font-family="Tahoma, Verdana, 'Segoe UI', sans-serif" font-weight="bold" font-size="14" fill="#ffffff">5. DECIDE</text>
+<g font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="13" fill="#000000" text-anchor="middle">
+<text x="190" y="532">graded rules turn what differs</text>
+<text x="190" y="551">into one verdict</text>
+</g>
+<polygon points="184,576 196,576 196,588 202,588 190,598 178,588 184,588" fill="#ff0000" stroke="#000000" stroke-width="1"/>
+<rect x="20" y="600" width="340" height="48" rx="10" fill="#008000" stroke="#000000" stroke-width="2"/>
+<rect x="24" y="603" width="332" height="20" rx="8" fill="#ffffff" opacity="0.18"/>
+<text x="190" y="622" font-family="'Arial Black', Impact, 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="15" fill="#ffffff" text-anchor="middle">MATCHES SOURCE</text>
+<text x="190" y="638" font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="11.5" fill="#ffffff" text-anchor="middle">exit 0</text>
+<rect x="20" y="656" width="340" height="48" rx="10" fill="#c00000" stroke="#000000" stroke-width="2"/>
+<rect x="24" y="659" width="332" height="20" rx="8" fill="#ffffff" opacity="0.18"/>
+<text x="190" y="678" font-family="'Arial Black', Impact, 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="15" fill="#ffffff" text-anchor="middle">DIFFERS FROM SOURCE</text>
+<text x="190" y="694" font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="11.5" fill="#ffffff" text-anchor="middle">exit 1 · read the findings</text>
+<rect x="20" y="712" width="340" height="48" rx="10" fill="#ffcc00" stroke="#000000" stroke-width="2"/>
+<rect x="24" y="715" width="332" height="20" rx="8" fill="#ffffff" opacity="0.18"/>
+<text x="190" y="734" font-family="'Arial Black', Impact, 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="15" fill="#000000" text-anchor="middle">COULD NOT VERIFY</text>
+<text x="190" y="750" font-family="'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive" font-size="11.5" fill="#000000" text-anchor="middle">exit 2 · never "safe"</text>
+</svg>

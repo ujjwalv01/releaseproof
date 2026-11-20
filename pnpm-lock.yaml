@@ -256,6 +256,12 @@ importers:
         specifier: 'catalog:'
         version: 7.5.22
 
+  website:
+    devDependencies:
+      marked:
+        specifier: 18.1.3
+        version: 18.1.3
+
 packages:
 
   '@actions/core@3.0.1':
@@ -1288,6 +1294,11 @@ packages:
   make-fetch-happen@16.0.1:
     resolution: {integrity: sha512-uUv1yxHzaKVVEPfcFeGSNov/Cehjv08ovlY8ImTljgL7Q+SiA0dAYLQ6SYVa2kkKqNj4Y3aZEI7xv2teadie0A==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
+
+  marked@18.1.3:
+    resolution: {integrity: sha512-9ChMH8EVVgjgID49nsL6IWxWk5c6GtAsq/xw7U1ggkjkU5AGuv68oLTVlFRtvcUYZtpbNyjyvGo3YDu0fGapiw==}
+    engines: {node: '>= 20'}
+    hasBin: true
 
   minimatch@10.2.6:
     resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
@@ -2564,6 +2575,8 @@ snapshots:
     transitivePeerDependencies:
       - kerberos
       - supports-color
+
+  marked@18.1.3: {}
 
   minimatch@10.2.6:
     dependencies:

@@ -1,0 +1,178 @@
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  build,
+  CONTENT_SECURITY_POLICY,
+  checkLinks,
+  PAGES,
+  REPOSITORY,
+  ROOT,
+  renderMarkdown,
+  rewriteHref,
+  slugify,
+} from "./build.mjs";
+
+describe("slugify", () => {
+  it.each([
+    ["Does `--offline` disable all network access?", "does---offline-disable-all-network-access"],
+    [
+      "How do I check a staged version (`--stage`, token requirements)?",
+      "how-do-i-check-a-staged-version---stage-token-requirements",
+    ],
+    ["1. Goal", "1-goal"],
+    ["0.2.2", "022"],
+    ["What's new", "whats-new"],
+  ])("gives %j GitHub's anchor %j", (heading, slug) => {
+    expect(slugify(heading)).toBe(slug);
+  });
+});
+
+describe("rewriteHref", () => {
+  it("points links to Markdown that has a page at that page, keeping the anchor", () => {
+    expect(
+      rewriteHref("./docs/faq.md#does---offline-disable-all-network-access", "README.md"),
+    ).toBe("faq.html#does---offline-disable-all-network-access");
+    expect(rewriteHref("rules.md", "docs/faq.md")).toBe("rules.html");
+    expect(rewriteHref("../CONTRIBUTING.md", "docs/faq.md")).toBe("contributing.html");
+    expect(rewriteHref("../packages/cli/CHANGELOG.md", "docs/faq.md")).toBe("changelog.html");
+  });
+
+  it("points other repository files and folders at GitHub", () => {
+    expect(rewriteHref("../packages/core/src/rules/files.ts#L10", "docs/rules.md")).toBe(
+      `${REPOSITORY}/blob/main/packages/core/src/rules/files.ts#L10`,
+    );
+    expect(rewriteHref("./action.yml", "README.md")).toBe(`${REPOSITORY}/blob/main/action.yml`);
+    expect(rewriteHref("../fixtures/", "docs/rules.md")).toBe(`${REPOSITORY}/tree/main/fixtures`);
+    expect(rewriteHref("./", "README.md")).toBe(REPOSITORY);
+  });
+
+  it("keeps absolute URLs and in-page anchors", () => {
+    for (const href of ["https://www.sigstore.dev/", "mailto:a@example.com", "#usage", "//cdn"]) {
+      expect(rewriteHref(href, "docs/faq.md")).toBe(href);
+    }
+  });
+
+  it("refuses links that leave the repository", () => {
+    expect(() => rewriteHref("../../etc/passwd", "docs/faq.md")).toThrow("outside the repository");
+  });
+});
+
+describe("renderMarkdown", () => {
+  it("gives headings GitHub's anchors, numbering repeats", () => {
+    const html = renderMarkdown("# Usage\n\n## Usage\n\n## Does `--offline` work?", "docs/x.md");
+    expect(html).toContain('<h1 id="usage">Usage</h1>');
+    expect(html).toContain('<h2 id="usage-1">Usage</h2>');
+    expect(html).toContain('<h2 id="does---offline-work">Does <code>--offline</code> work?</h2>');
+  });
+
+  it("anchors rule ids in rule tables only, and wraps tables so they scroll", () => {
+    const html = renderMarkdown(
+      [
+        "| Id | Severity |",
+        "| --- | --- |",
+        "| `file-added` / `file-missing` | high |",
+        "",
+        "| Verdict | Exit code |",
+        "| --- | --- |",
+        "| `not-a-rule-table` | 0 |",
+      ].join("\n"),
+      "docs/rules.md",
+    );
+    expect(html).toContain('<code id="file-added">file-added</code>');
+    expect(html).toContain('<code id="file-missing">file-missing</code>');
+    expect(html).toContain("<code>not-a-rule-table</code>");
+    expect(html).toContain('<div class="table-wrap"><table>');
+  });
+});
+
+describe("checkLinks", () => {
+  const pages = new Map([
+    ["a.html", '<h1 id="top">A</h1><a href="b.html#here">b</a><img src="images/x.svg">'],
+    ["b.html", '<p id="here"></p><a href="#top">x</a><a href="a.html#gone">a</a><p id="here"></p>'],
+  ]);
+
+  it("reports missing files, missing anchors and repeated ids", () => {
+    expect(checkLinks(pages, () => false).sort()).toEqual([
+      'a.html: src="images/x.svg" points to a missing file',
+      'b.html: href="#top" points to a missing anchor',
+      'b.html: href="a.html#gone" points to a missing anchor',
+      'b.html: the id "here" is used more than once',
+    ]);
+  });
+
+  it("accepts links that resolve", () => {
+    const ok = new Map([
+      ["a.html", '<p id="x"></p><a href="#x">x</a><a href="https://e.com/#y">y</a>'],
+    ]);
+    expect(checkLinks(ok, () => false)).toEqual([]);
+  });
+});
+
+describe("PAGES", () => {
+  it("has a page for every Markdown file in docs/", () => {
+    const docs = readdirSync(path.join(ROOT, "docs"))
+      .filter((file) => file.endsWith(".md"))
+      .map((file) => `docs/${file}`);
+    const missing = docs.filter((file) => !PAGES.some((page) => page.source === file));
+    expect(missing, "add these files to PAGES in website/build.mjs").toEqual([]);
+  });
+
+  it("uses each output name once", () => {
+    const outputs = PAGES.map((page) => page.output);
+    expect(new Set(outputs).size).toBe(outputs.length);
+  });
+});
+
+describe("build", () => {
+  let outDir;
+  let result;
+  beforeAll(() => {
+    outDir = mkdtempSync(path.join(tmpdir(), "releaseproof-site-"));
+    result = build({ outDir, commit: "a".repeat(40) });
+  });
+  afterAll(() => {
+    rmSync(outDir, { recursive: true, force: true });
+  });
+  const page = (file) => readFileSync(path.join(outDir, file), "utf8");
+
+  it("writes every page, the stylesheet and the images", () => {
+    expect(result.pages).toEqual(PAGES.map((p) => p.output));
+    for (const file of [...result.pages, "style.css", "images/logo.svg", "images/sponsor.svg"]) {
+      expect(existsSync(path.join(outDir, file)), file).toBe(true);
+    }
+  });
+
+  it("ships no JavaScript and loads nothing from other hosts", () => {
+    for (const file of result.pages) {
+      const html = page(file);
+      expect(html).not.toMatch(/<script/i);
+      expect(html).toContain(CONTENT_SECURITY_POLICY);
+      expect(html).not.toMatch(/\s(?:src|srcset)="(?:https?:)?\/\//);
+      expect(html).not.toMatch(/<link[^>]+href="(?:https?:)?\/\//);
+    }
+  });
+
+  it("gives every rule its own anchor on the rules page", () => {
+    const rules = page("rules.html");
+    for (const id of ["dependency-added", "unexpected-path", "file-changed"]) {
+      expect(rules).toContain(`<code id="${id}">`);
+    }
+  });
+
+  it("decorates the home page and links the sponsor page from every page", () => {
+    const home = page("index.html");
+    expect(home).toContain("images/under-construction.svg");
+    expect(home.indexOf('id="what-releaseproof-does"')).toBeLessThan(home.indexOf("how-it-works"));
+    expect(home.indexOf('id="usage"')).toBeLessThan(home.indexOf("images/terminal.svg"));
+    for (const file of result.pages) {
+      expect(page(file)).toContain('href="https://github.com/sponsors/ujjwalv01"');
+    }
+  });
+
+  it("marks the current page in the menu and names the commit it was built from", () => {
+    expect(page("faq.html")).toContain('<a class="button" href="faq.html" aria-current="page">');
+    expect(page("faq.html")).toContain(`${REPOSITORY}/commit/${"a".repeat(40)}`);
+  });
+});

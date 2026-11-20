@@ -180,6 +180,16 @@ Rules that apply to every PR:
 - Nothing in the repository may execute package contents on the host, phone home, or
   turn a "could not verify" into a "matches".
 
+## The website
+
+The [website](https://ujjwalv01.github.io/releaseproof/) is built from the Markdown you
+already edit: `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, the CLI changelog and every
+file in `docs/`. Never copy text into `website/`; it only holds the build script, the
+stylesheet and the images. `pnpm build` also builds the site into `website/dist` (open
+`website/dist/index.html` in a browser) and fails on a link or anchor that points nowhere.
+A new file in `docs/` needs an entry in `PAGES` in `website/build.mjs`; a test says so.
+Pages ship no JavaScript and load nothing from other hosts; keep it that way.
+
 ## Reporting a bug
 
 Use the [bug report form](https://github.com/ujjwalv01/releaseproof/issues/new?template=bug_report.yml).

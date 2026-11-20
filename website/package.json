@@ -1,0 +1,12 @@
+{
+  "name": "@releaseproof/website",
+  "private": true,
+  "description": "The releaseproof website, built from the Markdown in docs/ and the repository root",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "marked": "18.1.3"
+  }
+}
