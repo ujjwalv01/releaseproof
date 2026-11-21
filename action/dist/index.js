@@ -74681,13 +74681,15 @@ function manifestRules(context4) {
             evidence: { field, name, range }
           });
         } else if (expectedDeps[name] !== range) {
+          const expectedRange = expectedDeps[name] ?? "";
+          const repointed = isNonRegistrySpec(range) && !isNonRegistrySpec(expectedRange);
           findings.push({
             id: "dependency-changed",
-            severity: "medium",
+            severity: isNonRegistrySpec(range) && !isNonRegistrySpec(expectedRange) ? "high" : "medium",
             title: `dependency range changed: ${describeDependency(field, name)}`,
-            detail: `${name} is "${range}" in the release and "${expectedDeps[name]}" in the source.`,
+            detail: repointed ? `${name} is "${range}" in the release and "${expectedRange}" in the source, repointing the dependency away from the registry.` : `${name} is "${range}" in the release and "${expectedRange}" in the source.`,
             paths: ["package.json"],
-            evidence: { field, name, release: range, rebuild: expectedDeps[name] }
+            evidence: { field, name, release: range, rebuild: expectedRange }
           });
         }
       }
@@ -74758,6 +74760,27 @@ function manifestRules(context4) {
     }
   }
   return findings;
+}
+var NON_REGISTRY_PREFIXES = [
+  "git+",
+  "git:",
+  "git@",
+  "github:",
+  "gitlab:",
+  "bitbucket:",
+  "gist:",
+  "http:",
+  "https:",
+  "file:",
+  "link:",
+  "npm:"
+];
+function isNonRegistrySpec(range) {
+  const trimmed = range.trim().toLowerCase();
+  if (NON_REGISTRY_PREFIXES.some((prefix) => trimmed.startsWith(prefix))) {
+    return true;
+  }
+  return /^[a-z0-9_.-]+\/[a-z0-9_.-]+/i.test(trimmed);
 }
 
 // ../packages/core/src/rules/provenance.ts
