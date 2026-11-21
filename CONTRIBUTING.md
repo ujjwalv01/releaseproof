@@ -183,6 +183,27 @@ Rules that apply to every PR:
 - Nothing in the repository may execute package contents on the host, phone home, or
   turn a "could not verify" into a "matches".
 
+## Automerge (maintainers)
+
+A maintainer can add the `automerge` label to a pull request they have reviewed instead of
+waiting to merge it by hand: submit the review first (approve, or comment with suggested
+changes), then add the label. It means "merge this as I reviewed it, once my suggested
+changes are committed and CI is green". The workflow squash-merges only when all of this
+holds:
+
+- the content is exactly the commit you reviewed plus every suggested change a maintainer
+  made on it (the author commits them with **Commit suggestion**), and nothing else;
+- the title and the base branch are unchanged since the label was added;
+- CI has passed on the new head.
+
+Any other push or edit takes the label off again with a comment saying why, and a
+maintainer has to look once more. Without suggestions the label simply means "merge when CI
+is green, unless anything changes". Three things to know: a merge made this way starts the
+website deploy but not the release workflow, so the "Version Packages" pull request picks
+the change up on the next ordinary merge; updating the branch from `main` counts as a
+change; and a review submitted after the label does not count, so add the label last. The
+logic is in `.github/scripts/automerge.mjs`.
+
 ## The website
 
 The [website](https://ujjwalv01.github.io/releaseproof/) is built from the Markdown you

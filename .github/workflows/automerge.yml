@@ -1,0 +1,53 @@
+name: Automerge
+
+# Merges a pull request that carries the "automerge" label once it is exactly what a
+# maintainer approved: the commit that the person who added the label reviewed before
+# adding it, plus the maintainers' suggested changes on that commit, with an unchanged
+# title, and CI green on the result. Any other change takes the label off again with a
+# comment saying why. The logic and its tests are in .github/scripts/automerge.mjs.
+#
+# Why pull_request_target and workflow_run: both run this file from the default branch with
+# a token that may merge, also for pull requests from forks. That is safe ONLY because the
+# job never checks out, builds or runs anything from the pull request: the checkout below
+# takes the default branch, and only .github/scripts; the script talks to the GitHub API and
+# treats everything it reads from the pull request as data. Keep it that way: never add a
+# checkout of the head ref, a build step, or a shell command that contains pull request text.
+#
+# A merge made with this token starts no "push" workflows. The script starts the website
+# deploy itself; the release workflow (Version Packages PR) runs on the next ordinary push.
+on:
+  pull_request_target:
+    types: [labeled, synchronize, edited, ready_for_review]
+  # Every workflow that runs on pull_request, so a finished run re-checks labelled pull
+  # requests. A test keeps this list complete.
+  workflow_run:
+    workflows: ["CI", "Action self-test", "Website"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  automerge:
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
+      (github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, 'automerge'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # merge the pull request
+      pull-requests: write # comment, take the label off
+      issues: read # list the labelled pull requests and their label events
+      actions: write # read the CI runs of the head commit; start the website deploy after a merge
+      checks: read # check runs of the head commit
+      statuses: read # commit statuses of the head commit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Merge labelled pull requests that are exactly what was approved
+        run: node .github/scripts/automerge.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

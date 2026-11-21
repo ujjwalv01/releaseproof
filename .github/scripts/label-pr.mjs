@@ -26,6 +26,8 @@ export const OWN_LABELS = {
 /** Labels that describe an issue's state or audience, not the change; they stay on the issue. */
 const NOT_COPIED = new Set([
   GOOD_FIRST_ISSUE,
+  // A maintainer's decision about one pull request (see automerge.mjs); never inherited.
+  "automerge",
   "help wanted",
   "question",
   "duplicate",

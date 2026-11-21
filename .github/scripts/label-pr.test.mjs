@@ -20,7 +20,15 @@ describe("decideLabels", () => {
     expect(
       decideLabels({
         ...base,
-        issueLabels: ["help wanted", "question", "duplicate", "invalid", "wontfix", "docs"],
+        issueLabels: [
+          "help wanted",
+          "question",
+          "duplicate",
+          "invalid",
+          "wontfix",
+          "automerge",
+          "docs",
+        ],
       }),
     ).toEqual(["docs"]);
   });
