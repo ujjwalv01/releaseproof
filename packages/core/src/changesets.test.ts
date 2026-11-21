@@ -7,28 +7,42 @@ const root = fileURLToPath(new URL("../../../", import.meta.url));
 const changesetDir = path.join(root, ".changeset");
 const validBumps = new Set(["major", "minor", "patch"]);
 
-/** The directories listed in pnpm-workspace.yaml are `action` and `packages/*`. */
-function workspacePackageNames(): Set<string> {
+/**
+ * Workspace package names, each with whether its package.json says `"private": true`. The
+ * directories listed in pnpm-workspace.yaml are `packages/*`, `action` and `website`.
+ *
+ * Private packages are never released: .changeset/config.json sets
+ * `privatePackages.version` to false, so changesets leaves a changeset that names one out
+ * of the release, and its text never reaches the changelog.
+ */
+function workspacePackages(): Map<string, boolean> {
   const packageDirs = [
     path.join(root, "action"),
+    path.join(root, "website"),
     ...readdirSync(path.join(root, "packages"), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => path.join(root, "packages", entry.name)),
   ];
-  const names = new Set<string>();
+  const packages = new Map<string, boolean>();
   for (const dir of packageDirs) {
     const manifest = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8")) as {
       name?: unknown;
+      private?: unknown;
     };
-    if (typeof manifest.name !== "string" || !manifest.name || names.has(manifest.name)) {
+    if (typeof manifest.name !== "string" || !manifest.name || packages.has(manifest.name)) {
       throw new Error(`Missing or duplicate workspace package name in ${dir}`);
     }
-    names.add(manifest.name);
+    packages.set(manifest.name, manifest.private === true);
   }
-  return names;
+  return packages;
 }
 
-function changesetProblems(file: string, source: string, packages: ReadonlySet<string>): string[] {
+/** `packages` maps every workspace package name to whether it is private. */
+function changesetProblems(
+  file: string,
+  source: string,
+  packages: ReadonlyMap<string, boolean>,
+): string[] {
   const lines = source.split(/\r?\n/);
   if (lines[0] !== "---") return [`${file}:1: missing opening ---`];
 
@@ -56,6 +70,15 @@ function changesetProblems(file: string, source: string, packages: ReadonlySet<s
     const bump = (match[4] ?? match[5] ?? match[6]) as string;
     if (!packages.has(name)) {
       problems.push(`${file}:${index + 1}: unknown workspace package ${JSON.stringify(name)}`);
+    } else if (packages.get(name)) {
+      const released = [...packages]
+        .filter(([, isPrivate]) => !isPrivate)
+        .map(([released]) => JSON.stringify(released))
+        .sort();
+      const instead = released.length > 0 ? `; use ${released.join(" or ")}` : "";
+      problems.push(
+        `${file}:${index + 1}: ${JSON.stringify(name)} is private and is never released${instead}`,
+      );
     }
     if (!validBumps.has(bump)) {
       problems.push(`${file}:${index + 1}: invalid release bump ${JSON.stringify(bump)}`);
@@ -71,7 +94,7 @@ function changesetProblems(file: string, source: string, packages: ReadonlySet<s
 function changesetFileProblems(
   files: readonly string[],
   readSource: (file: string) => string,
-  packages: ReadonlySet<string>,
+  packages: ReadonlyMap<string, boolean>,
 ): string[] {
   return files
     .filter((file) => file.endsWith(".md") && file !== "README.md")
@@ -80,24 +103,62 @@ function changesetFileProblems(
 }
 
 describe("changeset metadata", () => {
-  const packages = workspacePackageNames();
+  const packages = workspacePackages();
 
-  it("reads package names from the workspace manifests", () => {
-    expect(packages.has("releaseproof")).toBe(true);
-    expect(packages.has("@releaseproof/core")).toBe(true);
-    expect(packages.has("@releaseproof/action")).toBe(true);
+  it("reads package names and whether they are private from the workspace manifests", () => {
+    expect(Object.fromEntries(packages)).toEqual({
+      releaseproof: false,
+      "@releaseproof/core": true,
+      "@releaseproof/action": true,
+      "@releaseproof/website": true,
+    });
   });
 
-  it("accepts valid package bumps, quoted keys, comments, and CRLF", () => {
-    const source = [
-      "---",
-      '"releaseproof": patch',
-      "'@releaseproof/core': minor # internal package",
-      '"@releaseproof/action": major',
-      "---",
-      "Description",
-    ].join("\r\n");
-    expect(changesetProblems("valid.md", source, packages)).toEqual([]);
+  it("relies on .changeset/config.json not versioning private packages", () => {
+    // If this setting changes, changesets starts releasing private packages and the
+    // "is private and is never released" check below must go.
+    const config = JSON.parse(readFileSync(path.join(changesetDir, "config.json"), "utf8")) as {
+      privatePackages?: unknown;
+    };
+    expect(config.privatePackages).toMatchObject({ version: false });
+  });
+
+  it.each(['"releaseproof": patch', "'releaseproof': minor # a new option", "releaseproof: major"])(
+    "accepts %s, also with CRLF line endings",
+    (entry) => {
+      for (const newline of ["\n", "\r\n"]) {
+        const source = ["---", "# a comment", entry, "", "---", "Description"].join(newline);
+        expect(changesetProblems("valid.md", source, packages)).toEqual([]);
+      }
+    },
+  );
+
+  it("rejects private packages, which changesets would leave out of the release", () => {
+    expect(
+      changesetProblems(
+        "private.md",
+        "---\n\"@releaseproof/core\": patch\n'@releaseproof/action': minor\n---\n",
+        packages,
+      ),
+    ).toEqual([
+      'private.md:2: "@releaseproof/core" is private and is never released; use "releaseproof"',
+      'private.md:3: "@releaseproof/action" is private and is never released; use "releaseproof"',
+    ]);
+    expect(
+      changesetProblems(
+        "mixed.md",
+        '---\n"releaseproof": patch\n"@releaseproof/core": patch\n---\n',
+        packages,
+      ),
+    ).toEqual([
+      'mixed.md:3: "@releaseproof/core" is private and is never released; use "releaseproof"',
+    ]);
+  });
+
+  it("names no replacement when every workspace package is private", () => {
+    expect(
+      changesetProblems("private.md", '---\n"only": patch\n---\n', new Map([["only", true]])),
+    ).toEqual(['private.md:2: "only" is private and is never released']);
   });
 
   it("rejects the nonexistent @releaseproof/cli package from issue #150", () => {

@@ -146,6 +146,9 @@ Docker flags or the planner need a unit test and, when they affect real packages
 
    Pick `patch` for fixes, `minor` for new options or rules, and write one or two lines
    as they should appear in the changelog. Pure docs, tests and CI changes need none.
+   The package is always `releaseproof`, also when the change is in `packages/core` or
+   `action/`: those are private and bundled into it, and a changeset that names a private
+   package is left out of the release (a test rejects it).
 
 7. **Commit** in small steps with conventional messages, for example
    `feat(core): resolve dist-tags before checking`, `fix(action): reject a relative
