@@ -1,5 +1,15 @@
 # releaseproof
 
+## 0.2.3
+
+### Patch Changes
+
+- [#177](https://github.com/ujjwalv01/releaseproof/pull/177) [`a3c2a17`](https://github.com/ujjwalv01/releaseproof/commit/a3c2a172e1d860fa1276fd8318ce029f7bc1f55a) Thanks [@jeelthacker1](https://github.com/jeelthacker1)! - Accept legacy npm package names containing uppercase letters while preserving their published casing in registry requests and attestation identifiers.
+
+- [#179](https://github.com/ujjwalv01/releaseproof/pull/179) [`be058db`](https://github.com/ujjwalv01/releaseproof/commit/be058db43badd5acdd8298dce6c767256fa6eaf7) Thanks [@jeelthacker1](https://github.com/jeelthacker1)! - Require explicit package and version inputs for published checks against private monorepo roots, instead of looking up an unpublished root package. Stage-only checks can still omit the package spec.
+
+- [#178](https://github.com/ujjwalv01/releaseproof/pull/178) [`3f92669`](https://github.com/ujjwalv01/releaseproof/commit/3f9266954e50f1db2f99a799cbac0d8143a703e9) Thanks [@jeelthacker1](https://github.com/jeelthacker1)! - Analyze scripts starting with a shebang for obfuscation and minification when the rebuild does not produce their contents, even if the file has no known code extension.
+
 ## 0.2.2
 
 ### Patch Changes
