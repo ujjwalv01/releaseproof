@@ -7,10 +7,12 @@ import {
   CONTENT_SECURITY_POLICY,
   checkLinks,
   PAGES,
+  pageUrl,
   REPOSITORY,
   ROOT,
   renderMarkdown,
   rewriteHref,
+  SITE_URL,
   slugify,
 } from "./build.mjs";
 
@@ -161,7 +163,42 @@ describe("build", () => {
       expect(html).not.toMatch(/<script/i);
       expect(html).toContain(CONTENT_SECURITY_POLICY);
       expect(html).not.toMatch(/\s(?:src|srcset)="(?:https?:)?\/\//);
-      expect(html).not.toMatch(/<link[^>]+href="(?:https?:)?\/\//);
+      expect(html).not.toMatch(/<link(?![^>]*\brel="canonical")[^>]+href="(?:https?:)?\/\//);
+    }
+  });
+
+  it("writes sitemap.xml and robots.txt for the public site URL", () => {
+    const sitemap = page("sitemap.xml");
+    expect(sitemap).toMatch(/^<\?xml version="1\.0" encoding="UTF-8"\?>\n<urlset xmlns="/);
+    expect(sitemap.trimEnd().endsWith("</urlset>")).toBe(true);
+    const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+    expect(locs).toEqual(PAGES.map((p) => pageUrl(p)));
+    expect(locs[0]).toBe(SITE_URL);
+    expect(locs).not.toContain(`${SITE_URL}index.html`);
+
+    const robots = page("robots.txt");
+    expect(robots).toContain("User-agent: *\nAllow: /");
+    expect(robots).toContain(`Sitemap: ${SITE_URL}sitemap.xml`);
+  });
+
+  it("includes canonical link and Open Graph metadata on every page", () => {
+    for (const entry of PAGES) {
+      const html = page(entry.output);
+      const isHome = entry.output === "index.html";
+      const expectedTitle = isHome ? "releaseproof · Home" : `${entry.label} · releaseproof`;
+      const expectedDescription = isHome
+        ? "releaseproof verifies that an npm release matches its source: it rebuilds the package from the certified commit and compares the two, file by file."
+        : `releaseproof documentation: ${entry.label}`;
+      const expectedUrl = pageUrl(entry);
+
+      expect(html.match(/<link rel="canonical" href="[^"]+">/g)).toEqual([
+        `<link rel="canonical" href="${expectedUrl}">`,
+      ]);
+      expect(html).toContain(`<meta property="og:title" content="${expectedTitle}">`);
+      expect(html).toContain(`<meta property="og:description" content="${expectedDescription}">`);
+      expect(html).toContain(`<meta property="og:url" content="${expectedUrl}">`);
+      expect(html).toContain('<meta property="og:type" content="website">');
+      expect(html).toContain('<meta property="og:site_name" content="releaseproof">');
     }
   });
 
