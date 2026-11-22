@@ -243,7 +243,7 @@ describe("build", () => {
       site: shortSite,
       headings: escapedHeadings,
     });
-    expect(escapedHtml).toContain('<a href="#a--b">A &#38; B</a>');
+    expect(escapedHtml).toContain('<a href="#a--b-">A &#38; B </a>');
     expect(escapedHtml).toContain('<a href="#code-and-link">code and link</a>');
     expect(escapedHtml).toContain('<a href="#third-quote">Third &#34;quote&#34;</a>');
   });
