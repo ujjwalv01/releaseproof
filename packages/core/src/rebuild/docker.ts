@@ -39,6 +39,15 @@ export interface DockerClient {
   run(spec: ContainerSpec): Promise<ContainerResult>;
 }
 
+/** Docker's minimum allowed container memory limit (6 MiB). */
+export const MIN_MEMORY_BYTES = 6 * 1024 * 1024;
+
+const MEMORY_UNIT_BYTES: Record<string, number> = {
+  k: 1024,
+  m: 1024 * 1024,
+  g: 1024 * 1024 * 1024,
+};
+
 /** Shared CLI/Action validation; an empty input leaves the rebuild default in effect. */
 export function parseMemoryLimit(
   value: string | undefined,
@@ -46,7 +55,12 @@ export function parseMemoryLimit(
 ): string | undefined {
   const memory = value?.trim().toLowerCase();
   if (!memory) return undefined;
-  if (!/^\d+[kmg]?$/.test(memory)) {
+  const match = /^(\d+)([kmg])$/.exec(memory);
+  if (!match) {
+    throw new ToolError(`${inputName} must be a Docker size such as 4g or 6144m, got "${memory}"`);
+  }
+  const bytes = Number(match[1]) * (MEMORY_UNIT_BYTES[match[2] as string] ?? 0);
+  if (!Number.isFinite(bytes) || bytes < MIN_MEMORY_BYTES) {
     throw new ToolError(`${inputName} must be a Docker size such as 4g or 6144m, got "${memory}"`);
   }
   return memory;

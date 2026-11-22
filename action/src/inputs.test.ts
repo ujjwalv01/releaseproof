@@ -172,7 +172,8 @@ describe("parseInputs memory", () => {
   it.each([
     ["4g", "4g"],
     ["6144m", "6144m"],
-    ["512", "512"],
+    ["6m", "6m"],
+    [" 4G ", "4g"],
     [" 6G ", "6g"],
     ["", undefined],
     ["   ", undefined],
@@ -180,12 +181,22 @@ describe("parseInputs memory", () => {
     expect(parseInputs(inputs({ memory }), context()).memory).toBe(expected);
   });
 
-  it.each(["4gb", "four", "-1g", "4g --privileged", "4g; echo unsafe", "4g\0", "4\n2g"])(
-    "rejects %j with the existing input message",
-    (memory) => {
-      expect(() => parseInputs(inputs({ memory }), context())).toThrow(
-        new ToolError(`Input "memory" must be a Docker size such as 4g or 6144m, got "${memory}"`),
-      );
-    },
-  );
+  it.each([
+    "0",
+    "0g",
+    "5m",
+    "4096",
+    "1k",
+    "4gb",
+    "four",
+    "-1g",
+    "4g --privileged",
+    "4g; echo unsafe",
+    "4g\0",
+    "4\n2g",
+  ])("rejects %j with the existing input message", (memory) => {
+    expect(() => parseInputs(inputs({ memory }), context())).toThrow(
+      new ToolError(`Input "memory" must be a Docker size such as 4g or 6144m, got "${memory}"`),
+    );
+  });
 });

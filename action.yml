@@ -37,7 +37,7 @@ inputs:
     description: Shell command to build with instead of the detected build script.
     required: false
   memory:
-    description: Docker memory limit for the build containers, such as 4g (the default) or 6g.
+    description: Docker memory limit with a k, m, or g unit (at least 6m) for the build containers, such as 4g (the default) or 6g.
     required: false
   fail-on:
     description: When to fail the job. "non-zero" (differs or could not verify), "differs" (only when it differs), or "never".

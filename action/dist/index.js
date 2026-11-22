@@ -73205,10 +73205,21 @@ var {
 } = getIpcExport();
 
 // ../packages/core/src/rebuild/docker.ts
+var MIN_MEMORY_BYTES = 6 * 1024 * 1024;
+var MEMORY_UNIT_BYTES = {
+  k: 1024,
+  m: 1024 * 1024,
+  g: 1024 * 1024 * 1024
+};
 function parseMemoryLimit(value, inputName = "--memory") {
   const memory = value?.trim().toLowerCase();
   if (!memory) return void 0;
-  if (!/^\d+[kmg]?$/.test(memory)) {
+  const match = /^(\d+)([kmg])$/.exec(memory);
+  if (!match) {
+    throw new ToolError(`${inputName} must be a Docker size such as 4g or 6144m, got "${memory}"`);
+  }
+  const bytes = Number(match[1]) * (MEMORY_UNIT_BYTES[match[2]] ?? 0);
+  if (!Number.isFinite(bytes) || bytes < MIN_MEMORY_BYTES) {
     throw new ToolError(`${inputName} must be a Docker size such as 4g or 6144m, got "${memory}"`);
   }
   return memory;
