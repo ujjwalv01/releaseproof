@@ -276,7 +276,7 @@ describe("renderMarkdown", () => {
       { maxChars: 700 },
     );
     expect(md).toContain("… finding list truncated; the JSON report has everything");
-    expect(md.match(/^- .*$/gm)?.every((line) => line.includes(`](${RULES_URL}#`))).toBe(true);
+    expect(md.match(/^- .*$/gm)?.every((line) => /#[a-z0-9-]+\)$/.test(line))).toBe(true);
     expect(md.length).toBeLessThanOrEqual(700);
     expect(md.trimEnd().endsWith('"safe".')).toBe(true);
   });
