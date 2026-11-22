@@ -10,6 +10,7 @@ import {
   REPOSITORY,
   ROOT,
   renderMarkdown,
+  renderPage,
   rewriteHref,
   slugify,
 } from "./build.mjs";
@@ -191,5 +192,59 @@ describe("build", () => {
   it("marks the current page in the menu and names the commit it was built from", () => {
     expect(page("faq.html")).toContain('<a href="faq.html" aria-current="page">');
     expect(page("faq.html")).toContain(`${REPOSITORY}/commit/${"a".repeat(40)}`);
+  });
+
+  it("includes an On this page section list on pages with 3+ h2 sections and omits it on short pages", () => {
+    for (const longPage of [
+      "faq.html",
+      "rules.html",
+      "design-rebuild.html",
+      "design-action.html",
+    ]) {
+      const html = page(longPage);
+      expect(html, longPage).toContain('<details class="toc-mobile">');
+      expect(html, longPage).toContain('<section class="box toc-sidebar">');
+      expect(html, longPage).not.toMatch(/<details class="toc-mobile"\s+open\b/);
+    }
+    expect(page("faq.html")).toContain(
+      '<a href="#does---offline-disable-all-network-access">Does --offline disable all network access?</a>',
+    );
+
+    const shortSite = {
+      pages: PAGES,
+      version: "0.2.2",
+      ruleCount: 42,
+      commit: undefined,
+    };
+    const twoHeadings = [];
+    const shortBody = renderMarkdown("# Title\n\n## First\n\n## Second\n", "docs/x.md", {
+      headings: twoHeadings,
+    });
+    const shortHtml = renderPage({
+      page: PAGES[1],
+      body: shortBody,
+      site: shortSite,
+      headings: twoHeadings,
+    });
+    expect(twoHeadings).toHaveLength(2);
+    expect(shortHtml).not.toContain("On this page");
+    expect(shortHtml).not.toContain("toc-mobile");
+    expect(shortHtml).not.toContain("toc-sidebar");
+
+    const escapedHeadings = [];
+    const escapedBody = renderMarkdown(
+      '# Title\n\n## A & B <script>\n\n## `code` and [link](rules.md)\n\n## Third "quote"\n',
+      "docs/x.md",
+      { headings: escapedHeadings },
+    );
+    const escapedHtml = renderPage({
+      page: PAGES[1],
+      body: escapedBody,
+      site: shortSite,
+      headings: escapedHeadings,
+    });
+    expect(escapedHtml).toContain('<a href="#a--b">A &#38; B</a>');
+    expect(escapedHtml).toContain('<a href="#code-and-link">code and link</a>');
+    expect(escapedHtml).toContain('<a href="#third-quote">Third &#34;quote&#34;</a>');
   });
 });

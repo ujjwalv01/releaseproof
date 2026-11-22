@@ -148,6 +148,7 @@ export function rewriteHref(href, source, { pages = PAGES, root = ROOT } = {}) {
  */
 export function renderMarkdown(markdown, source, options = {}) {
   const slug = uniqueSlugger();
+  const headings = Array.isArray(options.headings) ? options.headings : undefined;
   const marked = new Marked({
     gfm: true,
     walkTokens(token) {
@@ -176,7 +177,11 @@ export function renderMarkdown(markdown, source, options = {}) {
     },
     renderer: {
       heading({ tokens, depth }) {
-        const id = escapeHtml(slug(plainText(tokens)));
+        const text = plainText(tokens);
+        const id = escapeHtml(slug(text));
+        if (depth === 2 && headings) {
+          headings.push({ id, text });
+        }
         return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`;
       },
       tablecell(token) {
@@ -249,8 +254,16 @@ function link([href, text]) {
   return `<a href="${href}">${escapeHtml(text)}</a>`;
 }
 
+export const MIN_TOC_SECTIONS = 3;
+
+function renderTocLinks(headings) {
+  return headings
+    .map(({ id, text }) => `<li><a href="#${id}">${escapeHtml(text)}</a></li>`)
+    .join("\n");
+}
+
 /** One page of the site: header, menu, the rendered Markdown and a sidebar of boxes. */
-export function renderPage({ page, body, site }) {
+export function renderPage({ page, body, site, headings = [] }) {
   const isHome = page.output === "index.html";
   const title = isHome ? "releaseproof · Home" : `${page.label} · releaseproof`;
   const description = isHome
@@ -262,6 +275,14 @@ export function renderPage({ page, body, site }) {
       return `<li><a href="${item.output}"${current}>${escapeHtml(item.label)}</a></li>`;
     })
     .join("\n");
+  const hasToc = headings.length >= MIN_TOC_SECTIONS;
+  const tocItems = hasToc ? renderTocLinks(headings) : "";
+  const mobileToc = hasToc
+    ? `<details class="toc-mobile">\n<summary>On this page</summary>\n<nav aria-label="On this page">\n<ul>\n${tocItems}\n</ul>\n</nav>\n</details>\n`
+    : "";
+  const sidebarToc = hasToc
+    ? `<section class="box toc-sidebar">\n<h2 class="caption">On this page</h2>\n<nav aria-label="On this page">\n<ul>\n${tocItems}\n</ul>\n</nav>\n</section>\n`
+    : "";
   const built = site.commit
     ? ` · built from <a href="${REPOSITORY}/commit/${site.commit}">${site.commit.slice(0, 7)}</a>`
     : "";
@@ -290,11 +311,11 @@ ${menu}
 </nav>
 <div class="layout">
 <main id="content" class="box content" tabindex="-1">
-${body}
+${mobileToc}${body}
 <p class="edit-link"><a href="${REPOSITORY}/edit/main/${page.source}">Edit this page on GitHub</a></p>
 </main>
 <aside class="sidebar" aria-label="About the project">
-<section class="box">
+${sidebarToc}<section class="box">
 <h2 class="caption">About</h2>
 <ul>
 <li>Version <a href="changelog.html">${escapeHtml(site.version)}</a></li>
@@ -389,9 +410,10 @@ export function build({
   const html = new Map();
   for (const page of PAGES) {
     const markdown = readFileSync(path.join(root, page.source), "utf8");
-    const rendered = renderMarkdown(markdown, page.source, { root });
+    const headings = [];
+    const rendered = renderMarkdown(markdown, page.source, { root, headings });
     const body = page.output === "index.html" ? decorateHome(rendered) : rendered;
-    html.set(page.output, renderPage({ page, body, site }));
+    html.set(page.output, renderPage({ page, body, site, headings }));
   }
   const assets = ["style.css", ...readdirSync(path.join(HERE, "images")).map((f) => `images/${f}`)];
   const problems = checkLinks(html, (file) => assets.includes(file));
