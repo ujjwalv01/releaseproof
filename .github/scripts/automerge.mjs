@@ -64,6 +64,9 @@ query ($owner: String!, $name: String!, $number: Int!) {
 /** Repository permissions that allow merging; only these people may arm or suggest. */
 const CAN_MERGE = new Set(["admin", "maintain", "write"]);
 const PASSING = new Set(["success", "skipped", "neutral"]);
+/** How often, and how far apart, to look again after GitHub refused a merge. */
+const MERGE_RECHECKS = 5;
+const MERGE_RECHECK_MS = 2_000;
 /** Above this many suggestions in one file, only "none" and "all" applied are recognised. */
 const MAX_PARTIAL_SUGGESTIONS = 10;
 /** The id git gives a file with these bytes; the same value the trees API reports. */
@@ -244,9 +247,14 @@ function githubApi(token) {
 
 /**
  * Handles one event. `api(method, path, body)` calls the GitHub REST API.
- * `eventName` is pull_request_target or workflow_run.
+ * `eventName` is pull_request_target or workflow_run. `wait(ms)` pauses; tests replace it.
  */
-export async function run({ eventName, event }, api, log = console.log) {
+export async function run(
+  { eventName, event },
+  api,
+  log = console.log,
+  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+) {
   const repository = event.repository?.full_name ?? "";
   const defaultBranch = event.repository?.default_branch ?? "";
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository) || !defaultBranch) {
@@ -560,8 +568,14 @@ export async function run({ eventName, event }, api, log = console.log) {
       if (![405, 409, 422].includes(error.status)) {
         throw error;
       }
-      if ((await api("GET", `${repo}/pulls/${number}`)).merged) {
-        return log(`#${number}: already merged`);
+      // Another run of this workflow may be merging the same head right now (several
+      // events can arrive within a second). GitHub then refuses this call, and reports the
+      // pull request as merged only a moment later, so look a few times before giving up.
+      for (let attempt = 0; attempt < MERGE_RECHECKS; attempt++) {
+        if ((await api("GET", `${repo}/pulls/${number}`)).merged) {
+          return log(`#${number}: already merged`);
+        }
+        await wait(MERGE_RECHECK_MS);
       }
       return disarm(
         number,

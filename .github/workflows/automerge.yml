@@ -27,6 +27,13 @@ on:
 
 permissions: {}
 
+# One run per pull request at a time. Adding several labels at once sends one event per
+# label, and two runs merging the same head race each other. A waiting run may be replaced
+# by a newer one; that is fine, because every run decides from the current state.
+concurrency:
+  group: automerge-${{ github.event.pull_request.number || 'ci' }}
+  cancel-in-progress: false
+
 jobs:
   automerge:
     if: >-

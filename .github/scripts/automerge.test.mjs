@@ -371,7 +371,16 @@ describe("run", () => {
     });
     state.labeled = (sender = "owner", name = LABEL) =>
       state.event("labeled", { label: { name }, sender: { login: sender } });
-    state.go = (input = state.event()) => run(input, state.api, (line) => state.log.push(line));
+    state.waits = [];
+    state.go = (input = state.event()) =>
+      run(
+        input,
+        state.api,
+        (line) => state.log.push(line),
+        async (ms) => {
+          state.waits.push(ms);
+        },
+      );
     return state;
   }
 
@@ -752,19 +761,24 @@ describe("run", () => {
     expect(state.merges).toHaveLength(1);
   });
 
-  it("takes the label off when GitHub refuses the merge, unless it is merged already", async () => {
+  it("takes the label off when GitHub refuses the merge and the pull request stays unmerged", async () => {
     const refused = world();
     refused.mergeError = 405;
     await refused.go();
     expectLabelOff(refused, "GitHub refused the merge (HTTP 405)");
+    expect(refused.waits).toEqual([2000, 2000, 2000, 2000, 2000]);
+  });
 
+  it("says nothing when another run merged the same head a moment later", async () => {
+    // Read 1 is the evaluation. The merge is refused; reads 2 and 3 still say "not merged",
+    // and read 4 shows the merge the other run made.
     const raced = world();
     raced.mergeError = 405;
     const api = raced.api;
     let reads = 0;
     raced.api = async (method, path, body) => {
       const result = await api(method, path, body);
-      if (method === "GET" && path === "/repos/o/r/pulls/7" && ++reads > 1) {
+      if (method === "GET" && path === "/repos/o/r/pulls/7" && ++reads > 3) {
         return { ...result, merged: true };
       }
       return result;
@@ -772,6 +786,8 @@ describe("run", () => {
     await raced.go();
     expect(raced.removedLabel).toBe(false);
     expect(raced.posted).toEqual([]);
+    expect(raced.waits).toEqual([2000, 2000]);
+    expect(raced.log.join("\n")).toContain("#7: already merged");
   });
 });
 
@@ -814,6 +830,7 @@ describe("automerge.yml", () => {
     expect(code).toContain("persist-credentials: false");
     expect(code).not.toMatch(/pull_request\.head|head_ref|head\.sha|head\.ref|refs\/pull/);
     expect(code.match(/\$\{\{[^}]*\}\}/g)).toEqual([
+      expression("github.event.pull_request.number || 'ci'"),
       expression("github.event.repository.default_branch"),
       expression("github.token"),
     ]);
