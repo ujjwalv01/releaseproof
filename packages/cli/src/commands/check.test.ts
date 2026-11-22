@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { type CheckOptions, type CheckReport, ToolError } from "@releaseproof/core";
@@ -325,7 +325,7 @@ describe("runCheckCommand with --report", () => {
     },
   );
 
-  it("exits 2 with an error: line and no stack trace when writing to an existing directory fails", async () => {
+  it("exits 2 before running check with an error: line and no stack trace when --report is an existing directory", async () => {
     const dir = makeTempDir();
     const runCheck = vi.fn(async () => fakeReport(0));
     const streams = io();
@@ -335,13 +335,14 @@ describe("runCheckCommand with --report", () => {
     });
 
     expect(code).toBe(2);
+    expect(runCheck).not.toHaveBeenCalled();
     expect(streams.out).toEqual([]);
     expect(streams.err).toHaveLength(1);
     expect(streams.err[0]).toMatch(/^error: could not write report to /);
     expect(streams.err[0]).not.toMatch(/^\s+at /m);
   });
 
-  it("exits 2 with an error: line when a parent segment is a regular file, including single JSON error under --json", async () => {
+  it("exits 2 before running check when a parent segment is a regular file, including single JSON error under --json", async () => {
     const dir = makeTempDir();
     const blocker = path.join(dir, "not-a-dir");
     writeFileSync(blocker, "occupied", "utf8");
@@ -357,11 +358,60 @@ describe("runCheckCommand with --report", () => {
     );
 
     expect(code).toBe(2);
+    expect(runCheck).not.toHaveBeenCalled();
     expect(streams.err).toHaveLength(1);
     expect(streams.err[0]).toMatch(/^error: could not write report to /);
     expect(streams.err[0]).not.toMatch(/^\s+at /m);
     const parsed = JSON.parse(streams.out.join("")) as { error?: { message: string } };
     expect(parsed.error?.message).toMatch(/^could not write report to /);
+  });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "exits 2 before running check when the target directory is not writable",
+    async () => {
+      const dir = makeTempDir();
+      const readOnlyDir = path.join(dir, "locked");
+      mkdirSync(readOnlyDir);
+      chmodSync(readOnlyDir, 0o555);
+      const reportPath = path.join(readOnlyDir, "report.json");
+      const runCheck = vi.fn(async () => fakeReport(0));
+      const streams = io();
+
+      try {
+        const code = await runCheckCommand(
+          "x@1.0.0",
+          { report: reportPath, quiet: true },
+          streams.io,
+          { runCheck },
+        );
+
+        expect(code).toBe(2);
+        expect(runCheck).not.toHaveBeenCalled();
+        expect(streams.out).toEqual([]);
+        expect(streams.err).toHaveLength(1);
+        expect(streams.err[0]).toMatch(/^error: could not write report to /);
+        expect(streams.err[0]).not.toMatch(/^\s+at /m);
+      } finally {
+        chmodSync(readOnlyDir, 0o755);
+      }
+    },
+  );
+
+  it("overwrites an existing writable --report file", async () => {
+    const dir = makeTempDir();
+    const reportPath = path.join(dir, "report.json");
+    writeFileSync(reportPath, '{"stale":true}\n', "utf8");
+    const expected = fakeReport(0);
+    const runCheck = vi.fn(async () => expected);
+    const streams = io();
+
+    const code = await runCheckCommand("x@1.0.0", { report: reportPath, quiet: true }, streams.io, {
+      runCheck,
+    });
+
+    expect(code).toBe(0);
+    expect(runCheck).toHaveBeenCalledTimes(1);
+    expect(readFileSync(reportPath, "utf8")).toBe(`${JSON.stringify(expected, null, 2)}\n`);
   });
 
   it("does not write --report when runCheck throws ToolError", async () => {

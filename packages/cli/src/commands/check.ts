@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { accessSync, constants, mkdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   type CheckOptions,
@@ -50,12 +50,38 @@ function parseNodeMajor(value: string | undefined): number | undefined {
   return major;
 }
 
+function reportWriteError(filePath: string, error: unknown): ToolError {
+  if (error instanceof ToolError) {
+    return error;
+  }
+  const detail = error instanceof Error ? error.message : String(error);
+  return new ToolError(`could not write report to ${filePath}: ${detail}`);
+}
+
 function validateReportPath(value: string | undefined): string | undefined {
   if (value === undefined) {
     return undefined;
   }
   if (!value.trim() || value.includes("\0")) {
     throw new ToolError(`--report expects a file path, got ${JSON.stringify(value)}`);
+  }
+  try {
+    const dir = path.dirname(value);
+    mkdirSync(dir, { recursive: true });
+    accessSync(dir, constants.W_OK);
+    try {
+      const existing = statSync(value);
+      if (existing.isDirectory()) {
+        throw new ToolError(`could not write report to ${value}: path is a directory`);
+      }
+      accessSync(value, constants.W_OK);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+    }
+  } catch (error) {
+    throw reportWriteError(value, error);
   }
   return value;
 }
@@ -65,8 +91,7 @@ function writeReportFile(filePath: string, jsonText: string): void {
     mkdirSync(path.dirname(filePath), { recursive: true });
     writeFileSync(filePath, jsonText, "utf8");
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new ToolError(`could not write report to ${filePath}: ${detail}`);
+    throw reportWriteError(filePath, error);
   }
 }
 
