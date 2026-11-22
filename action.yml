@@ -40,7 +40,7 @@ inputs:
     description: Docker memory limit for the build containers, such as 4g (the default) or 6g.
     required: false
   fail-on:
-    description: When to fail the job. "non-zero" (differs or could not verify), "differs" (only when it differs), or "never".
+    description: When to fail the job. "non-zero" (differs or could not verify), "differs" (only when it differs), or "never". When the check itself cannot run (a tool error such as registry unreachable or Docker unavailable), the job fails whatever this value says, and the verdict and exit-code outputs are still set.
     required: false
     default: non-zero
   create-issue:

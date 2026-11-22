@@ -187,6 +187,22 @@ describe("runAction", () => {
     expect(byDefault.io.failures).toHaveLength(1);
   });
 
+  it.each(["never", "differs"] as const)(
+    "fails the job on a tool error even when fail-on is %j, while still setting outputs",
+    async (failOn) => {
+      const toolError = fakeIo({ "fail-on": failOn }, async () => {
+        throw new ToolError("registry is unreachable");
+      });
+      await runAction(toolError.actionIo);
+      expect(toolError.io.failures).toEqual(["could not verify: registry is unreachable"]);
+      expect(toolError.io.outputs).toMatchObject({
+        verdict: "could-not-verify",
+        "exit-code": "2",
+        summary: "registry is unreachable",
+      });
+    },
+  );
+
   it("sets outputs and a summary before failing closed when the check itself errors", async () => {
     const broken = fakeIo({}, async () => {
       throw new ToolError("Docker is not available");
