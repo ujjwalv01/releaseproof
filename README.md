@@ -80,8 +80,9 @@ to rebuild from when there is no provenance), `--registry <url>` to select the r
 (default `https://registry.npmjs.org/`), `--token <token>` to provide a registry token
 (default `NPM_TOKEN`, `NODE_AUTH_TOKEN` or `.npmrc`), `--node <major>` / `--image <image>` /
 `--build-command <cmd>` to override the build plan, `--memory <size>` for the container
-memory limit (default `4g`; big TypeScript builds may need more), `--json` for the full report
-(fields are described in [docs/json-report.md](./docs/json-report.md)),
+memory limit (default `4g`; big TypeScript builds may need more), `--json` for the full report on
+stdout, `--report <path>` to also write the JSON report to a file (the path is taken as given and
+parent directories are created; fields are described in [docs/json-report.md](./docs/json-report.md)),
 `--offline` to skip refreshing the Sigstore trust root, `--quiet` to suppress progress on
 stderr, `--keep-volume` to inspect the build afterwards. Every rule and severity is
 documented in [docs/rules.md](./docs/rules.md).

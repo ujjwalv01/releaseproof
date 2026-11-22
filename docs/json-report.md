@@ -1,6 +1,8 @@
 # The JSON report
 
-`releaseproof check --json` prints the full report to stdout. The GitHub Action writes the
+`releaseproof check --json` prints the full report to stdout, and `--report <path>` writes the
+same JSON report to a file (taken as given, creating parent directories) alongside the
+normal stdout output. The GitHub Action writes the
 same report to `releaseproof-report.json` (or the path in its `report-path` input). Use it
 to post-process a check in CI.
 
@@ -219,6 +221,8 @@ and `verdict.findings` lists what to read before approving.
 
 ```sh
 npx releaseproof check sigstore@5.0.0 --json > report.json
+# or keep the human-readable text on stdout while writing the JSON file:
+npx releaseproof check sigstore@5.0.0 --report report.json
 jq -r '.verdict.status' report.json
 jq -r '.verdict.findings[] | select(.severity == "critical" or .severity == "high") | .id' report.json
 ```

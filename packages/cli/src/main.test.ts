@@ -13,6 +13,7 @@ describe("CLI exit status", () => {
   it.each([
     { args: ["check", "--bogus", "x@1.0.0"], status: 2 },
     { args: ["check", "--node"], status: 2 },
+    { args: ["check", "--report"], status: 2 },
     { args: ["bogus-command"], status: 2 },
     { args: ["--help"], status: 0 },
     { args: ["check", "--help"], status: 0 },

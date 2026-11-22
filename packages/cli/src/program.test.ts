@@ -44,9 +44,11 @@ describe("releaseproof CLI", () => {
     expect(output).toMatch(/^ {2}2 {2}COULD NOT VERIFY, or a tool error/m);
   });
 
-  it("documents --no-rekor in check --help", () => {
+  it("documents --no-rekor and --report in check --help", () => {
     const check = createProgram().commands.find((command) => command.name() === "check");
-    expect(check?.helpInformation()).toContain("--no-rekor");
+    const help = check?.helpInformation();
+    expect(help).toContain("--no-rekor");
+    expect(help).toContain("--report <path>");
   });
 
   it("documents every check option in README.md", () => {

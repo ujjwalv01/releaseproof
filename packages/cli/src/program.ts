@@ -39,6 +39,10 @@ export function createProgram(): Command {
     )
     .option("--keep-volume", "keep the Docker volume after the run, for debugging")
     .option("--json", "print the full report as JSON")
+    .option(
+      "--report <path>",
+      "write the full JSON report to <path> alongside stdout (path is taken as given)",
+    )
     .option("--quiet", "no progress output on stderr")
     .addHelpText(
       "after",

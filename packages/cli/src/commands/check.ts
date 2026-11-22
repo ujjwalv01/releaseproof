@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import {
   type CheckOptions,
   type CheckReport,
@@ -24,6 +26,7 @@ export interface CheckCommandOptions {
   rekor?: boolean | undefined;
   keepVolume?: boolean | undefined;
   json?: boolean | undefined;
+  report?: string | undefined;
   quiet?: boolean | undefined;
 }
 
@@ -47,6 +50,26 @@ function parseNodeMajor(value: string | undefined): number | undefined {
   return major;
 }
 
+function validateReportPath(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!value.trim() || value.includes("\0")) {
+    throw new ToolError(`--report expects a file path, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+function writeReportFile(filePath: string, jsonText: string): void {
+  try {
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFileSync(filePath, jsonText, "utf8");
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new ToolError(`could not write report to ${filePath}: ${detail}`);
+  }
+}
+
 /**
  * `releaseproof check <name>@<version>`. Progress goes to stderr, the report to stdout,
  * and the exit code is the verdict's: 0 match, 1 differs, 2 could not verify / tool error.
@@ -64,6 +87,7 @@ export async function runCheckCommand(
     );
   }
   try {
+    const reportPath = validateReportPath(options.report);
     const report = await deps.runCheck({
       spec,
       stageId: options.stage,
@@ -80,7 +104,12 @@ export async function runCheckCommand(
       keepVolume: options.keepVolume,
       log: options.quiet ? undefined : (line) => io.stderr(`… ${line}\n`),
     });
-    io.stdout(options.json ? `${JSON.stringify(report, null, 2)}\n` : formatReport(report));
+    const jsonReport =
+      options.json || reportPath !== undefined ? `${JSON.stringify(report, null, 2)}\n` : undefined;
+    if (reportPath !== undefined && jsonReport !== undefined) {
+      writeReportFile(reportPath, jsonReport);
+    }
+    io.stdout(options.json && jsonReport !== undefined ? jsonReport : formatReport(report));
     return report.verdict.exitCode;
   } catch (error) {
     if (error instanceof ToolError) {

@@ -1,5 +1,8 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { type CheckOptions, type CheckReport, ToolError } from "@releaseproof/core";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCheckCommand } from "./check.js";
 
 function fakeReport(exitCode: 0 | 1 | 2): CheckReport {
@@ -246,5 +249,134 @@ describe("runCheckCommand with --repo", () => {
       }),
     ).toBe(0);
     expect(runCheck.mock.calls[0]?.[0].repository).toBe("git+https://github.com/o/r.git");
+  });
+});
+
+describe("runCheckCommand with --report", () => {
+  const tempDirs: string[] = [];
+
+  function makeTempDir(): string {
+    const dir = mkdtempSync(path.join(tmpdir(), "releaseproof-cli-report-"));
+    tempDirs.push(dir);
+    return dir;
+  }
+
+  afterEach(() => {
+    while (tempDirs.length > 0) {
+      const dir = tempDirs.pop();
+      if (dir) {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("writes pretty-printed JSON with a trailing newline, creates parent dirs, and keeps text on stdout", async () => {
+    const dir = makeTempDir();
+    const reportPath = path.join(dir, "nested", "sub", "report.json");
+    const expected = fakeReport(1);
+    const runCheck = vi.fn(async () => expected);
+    const streams = io();
+
+    const code = await runCheckCommand("x@1.0.0", { report: reportPath, quiet: true }, streams.io, {
+      runCheck,
+    });
+
+    expect(code).toBe(1);
+    expect(streams.err).toEqual([]);
+    expect(streams.out.join("")).toContain("Verdict: summary");
+    const contents = readFileSync(reportPath, "utf8");
+    expect(contents).toBe(`${JSON.stringify(expected, null, 2)}\n`);
+  });
+
+  it("writes the file and keeps JSON on stdout when combined with --json", async () => {
+    const dir = makeTempDir();
+    const reportPath = path.join(dir, "report.json");
+    const expected = fakeReport(0);
+    const runCheck = vi.fn(async () => expected);
+    const streams = io();
+
+    const code = await runCheckCommand(
+      "x@1.0.0",
+      { json: true, report: reportPath, quiet: true },
+      streams.io,
+      { runCheck },
+    );
+
+    expect(code).toBe(0);
+    expect(streams.err).toEqual([]);
+    expect(streams.out.join("")).toBe(`${JSON.stringify(expected, null, 2)}\n`);
+    expect(readFileSync(reportPath, "utf8")).toBe(`${JSON.stringify(expected, null, 2)}\n`);
+  });
+
+  it.each(["", "   ", "report\0.json"])(
+    "rejects invalid --report path %j before running a check",
+    async (report) => {
+      const runCheck = vi.fn(async () => fakeReport(0));
+      const streams = io();
+
+      const code = await runCheckCommand("x@1.0.0", { report }, streams.io, { runCheck });
+
+      expect(code).toBe(2);
+      expect(runCheck).not.toHaveBeenCalled();
+      expect(streams.out).toEqual([]);
+      expect(streams.err).toEqual([
+        `error: --report expects a file path, got ${JSON.stringify(report)}\n`,
+      ]);
+    },
+  );
+
+  it("exits 2 with an error: line and no stack trace when writing to an existing directory fails", async () => {
+    const dir = makeTempDir();
+    const runCheck = vi.fn(async () => fakeReport(0));
+    const streams = io();
+
+    const code = await runCheckCommand("x@1.0.0", { report: dir, quiet: true }, streams.io, {
+      runCheck,
+    });
+
+    expect(code).toBe(2);
+    expect(streams.out).toEqual([]);
+    expect(streams.err).toHaveLength(1);
+    expect(streams.err[0]).toMatch(/^error: could not write report to /);
+    expect(streams.err[0]).not.toMatch(/^\s+at /m);
+  });
+
+  it("exits 2 with an error: line when a parent segment is a regular file, including single JSON error under --json", async () => {
+    const dir = makeTempDir();
+    const blocker = path.join(dir, "not-a-dir");
+    writeFileSync(blocker, "occupied", "utf8");
+    const reportPath = path.join(blocker, "report.json");
+    const runCheck = vi.fn(async () => fakeReport(0));
+    const streams = io();
+
+    const code = await runCheckCommand(
+      "x@1.0.0",
+      { json: true, report: reportPath, quiet: true },
+      streams.io,
+      { runCheck },
+    );
+
+    expect(code).toBe(2);
+    expect(streams.err).toHaveLength(1);
+    expect(streams.err[0]).toMatch(/^error: could not write report to /);
+    expect(streams.err[0]).not.toMatch(/^\s+at /m);
+    const parsed = JSON.parse(streams.out.join("")) as { error?: { message: string } };
+    expect(parsed.error?.message).toMatch(/^could not write report to /);
+  });
+
+  it("does not write --report when runCheck throws ToolError", async () => {
+    const dir = makeTempDir();
+    const reportPath = path.join(dir, "should-not-exist", "report.json");
+    const runCheck = vi.fn(async () => {
+      throw new ToolError("Docker is not available");
+    });
+    const streams = io();
+
+    const code = await runCheckCommand("x@1.0.0", { report: reportPath }, streams.io, { runCheck });
+
+    expect(code).toBe(2);
+    expect(streams.out).toEqual([]);
+    expect(streams.err).toEqual(["error: Docker is not available\n"]);
+    expect(() => readFileSync(reportPath, "utf8")).toThrow();
   });
 });
