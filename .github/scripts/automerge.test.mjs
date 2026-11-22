@@ -288,6 +288,10 @@ describe("run", () => {
       checkRuns: [],
       status: { total_count: 0, state: "pending" },
       mergeError: undefined,
+      linkedIssues: [],
+      linkedError: undefined,
+      graphqlVariables: [],
+      closedIssues: [],
       posted: [],
       merges: [],
       dispatched: [],
@@ -322,6 +326,20 @@ describe("run", () => {
         state.merges.push(body);
         state.pr = { ...state.pr, merged: true, state: "closed" };
         return { merged: true };
+      }
+      if (route === "POST /graphql") {
+        if (state.linkedError) throw fail(state.linkedError);
+        state.graphqlVariables.push(body.variables);
+        return {
+          data: {
+            repository: { pullRequest: { closingIssuesReferences: { nodes: state.linkedIssues } } },
+          },
+        };
+      }
+      const closed = /^PATCH \/issues\/(\d+)$/.exec(route)?.[1];
+      if (closed) {
+        state.closedIssues.push([Number(closed), body]);
+        return {};
       }
       const permission = /^GET \/collaborators\/([^/]+)\/permission$/.exec(route)?.[1];
       if (permission) {
@@ -487,6 +505,45 @@ describe("run", () => {
       expectWaiting(state);
       expect(state.posted).toEqual([]);
       expect(state.log.join("\n")).toContain("not every suggestion is committed yet");
+    });
+
+    it("closes the open issues of this repository that the merged pull request closes", async () => {
+      const state = world();
+      const linked = (number, issueState, repository = "o/r") => ({
+        number,
+        state: issueState,
+        repository: { nameWithOwner: repository },
+      });
+      state.linkedIssues = [
+        linked(25, "OPEN"),
+        linked(26, "CLOSED"),
+        linked(27, "OPEN", "someone/else"),
+        linked(28, "OPEN", "O/R"),
+      ];
+      await state.go();
+      expect(state.merges).toHaveLength(1);
+      expect(state.graphqlVariables).toEqual([{ owner: "o", name: "r", number: 7 }]);
+      const completed = { state: "closed", state_reason: "completed" };
+      expect(state.closedIssues).toEqual([
+        [25, completed],
+        [28, completed],
+      ]);
+    });
+
+    it("closes no issue when nothing was merged, and only logs when closing fails", async () => {
+      const waiting = world();
+      waiting.linkedIssues = [{ number: 25, state: "OPEN", repository: { nameWithOwner: "o/r" } }];
+      waiting.runs.pop();
+      await waiting.go();
+      expect(waiting.merges).toEqual([]);
+      expect(waiting.closedIssues).toEqual([]);
+
+      const failing = world();
+      failing.linkedError = 502;
+      await failing.go();
+      expect(failing.merges).toHaveLength(1);
+      expect(failing.dispatched).toHaveLength(FOLLOW_UP_WORKFLOWS.length);
+      expect(failing.log.join("\n")).toContain("#7: could not close its linked issues");
     });
 
     it("re-checks every labelled pull request when a CI run finishes", async () => {

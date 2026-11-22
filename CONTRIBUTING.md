@@ -198,7 +198,8 @@ holds:
 
 Any other push or edit takes the label off again with a comment saying why, and a
 maintainer has to look once more. Without suggestions the label simply means "merge when CI
-is green, unless anything changes". Three things to know: a merge made this way starts the
+is green, unless anything changes". After merging, the workflow closes the issues the pull
+request says it closes. Three things to know: a merge made this way starts the
 website deploy but not the release workflow, so the "Version Packages" pull request picks
 the change up on the next ordinary merge; updating the branch from `main` counts as a
 change; and a review submitted after the label does not count, so add the label last. The
