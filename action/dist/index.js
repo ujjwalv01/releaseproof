@@ -75484,6 +75484,10 @@ function parseInputs(getInput2, context4) {
   if (stageInput && !STAGE_ID_RE.test(stageInput)) {
     throw new ToolError(`Input "stage" must be a stage id (UUID), got "${stageInput}"`);
   }
+  const rekorInput = getInput2("rekor").trim().toLowerCase() || "true";
+  if (!["true", "false"].includes(rekorInput)) {
+    throw new ToolError(`Input "rekor" must be true or false, got "${rekorInput}"`);
+  }
   const manifest = readWorkspaceManifest(context4.workspace);
   const packageInput = getInput2("package").trim();
   const versionInput = getInput2("version").trim();
@@ -75539,6 +75543,7 @@ function parseInputs(getInput2, context4) {
   return {
     spec,
     stageId: stageInput || void 0,
+    rekor: rekorInput === "true",
     repository: repoInput || void 0,
     commit: commitInput || void 0,
     registry: getInput2("registry").trim() || void 0,
@@ -75706,6 +75711,7 @@ async function runAction(io2) {
     report = await io2.check({
       spec: inputs.spec,
       stageId: inputs.stageId,
+      rekor: inputs.rekor,
       registry: inputs.registry,
       repository: inputs.repository,
       commit: inputs.commit,

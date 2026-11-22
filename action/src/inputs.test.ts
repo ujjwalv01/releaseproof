@@ -109,6 +109,7 @@ describe("parseInputs", () => {
       [{ node: "twenty" }, /Node.js major/],
       [{ "fail-on": "sometimes" }, /non-zero, differs or never/],
       [{ "create-issue": "yes" }, /true or false/],
+      [{ rekor: "sometimes" }, /Input "rekor" must be true or false/],
       [{ "report-path": "../escape.json" }, /relative path inside the workspace/],
       [{ "report-path": "/tmp/x.json" }, /relative path inside the workspace/],
     ];
@@ -140,6 +141,17 @@ describe("parseInputs with a stage id", () => {
       context({ workspace: empty }),
     );
     expect(noSpec.spec).toBeUndefined();
+  });
+
+  it.each([
+    ["false", false],
+    ["FALSE", false],
+    ["true", true],
+    ["TRUE", true],
+    ["", true],
+  ])("parses rekor input %j to %j", (rekor, expected) => {
+    const parsed = parseInputs(inputs({ rekor }), context());
+    expect(parsed.rekor).toBe(expected);
   });
 
   it("does not use a private root as a stage cross-check", () => {

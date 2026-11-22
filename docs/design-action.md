@@ -31,6 +31,9 @@ the package's own repository after a release:
 The action runs untrusted builds (inside Docker, as the CLI does) on a runner that holds a
 `GITHUB_TOKEN`. The job must never become the attack vector this tool detects.
 
+Rekor lookups for staged versions send the release tarball's SHA-512 to `rekor.sigstore.dev`
+by default; set `rekor: "false"` to opt out, matching the CLI's `--no-rekor`.
+
 | Risk | Decision |
 | --- | --- |
 | `pull_request_target` gives contributor-controlled code the base repository's secrets. It is how the TanStack attack started. | The action refuses to run on that event, with an explanation. A release check has no business on a pull request. |

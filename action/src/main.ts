@@ -56,6 +56,7 @@ export async function runAction(io: ActionIo): Promise<void> {
     report = await io.check({
       spec: inputs.spec,
       stageId: inputs.stageId,
+      rekor: inputs.rekor,
       registry: inputs.registry,
       repository: inputs.repository,
       commit: inputs.commit,

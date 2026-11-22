@@ -139,6 +139,7 @@ describe("runAction", () => {
       spec: "releaseproof@1.2.3",
       repository: "https://github.com/ujjwalv01/releaseproof",
       commit: sha,
+      rekor: true,
     });
     expect(io.outputs).toMatchObject({
       verdict: "differs-from-source",
