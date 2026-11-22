@@ -67,6 +67,10 @@ outputs:
     description: 0 matches, 1 differs, 2 could not verify
   summary:
     description: One-line verdict
+  findings:
+    description: Total number of findings (0 when there are none)
+  highest-severity:
+    description: Highest finding severity (critical, high, medium, low, info, or none)
   report-path:
     description: Path of the JSON report
   issue-url:

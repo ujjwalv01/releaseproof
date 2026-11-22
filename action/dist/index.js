@@ -75749,6 +75749,8 @@ async function runAction(io2) {
   io2.setOutput("verdict", report.verdict.status);
   io2.setOutput("exit-code", String(report.verdict.exitCode));
   io2.setOutput("summary", report.verdict.summary);
+  io2.setOutput("findings", String(report.verdict.findings.length));
+  io2.setOutput("highest-severity", sortFindings(report.verdict.findings)[0]?.severity ?? "none");
   io2.setOutput("report-path", inputs.reportPath);
   io2.info(text);
   const markdown = renderMarkdown(report, text, {

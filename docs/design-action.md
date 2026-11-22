@@ -10,8 +10,8 @@ write `uses: ujjwalv01/releaseproof@<sha>`.
 `releaseproof/action` runs `releaseproof check` for one package version inside a workflow
 and reports the verdict three ways: the job summary (always), the job status (configurable
 with `fail-on`), and optionally an issue. The full JSON report is written to a file the
-workflow can upload as an artifact. Outputs: `verdict`, `exit-code`, `summary`,
-`report-path`, `issue-url`.
+workflow can upload as an artifact. Outputs: `verdict`, `exit-code`, `summary`, `findings`,
+`highest-severity`, `report-path`, `issue-url`.
 
 Defaults are chosen so that the common case needs no inputs at all when the action runs in
 the package's own repository after a release:
@@ -61,9 +61,12 @@ jobs:
       - uses: actions/checkout@<sha>
         with:
           persist-credentials: false
-      - uses: ujjwalv01/releaseproof@<sha>
+      - id: check
+        uses: ujjwalv01/releaseproof@<sha>
         with:
           create-issue: "false"
+      - if: always() && steps.check.outputs.highest-severity == 'critical'
+        run: echo "Critical finding (${{ steps.check.outputs.findings }} total)"
       - uses: actions/upload-artifact@<sha>
         if: always()
         with:
