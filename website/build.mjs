@@ -32,6 +32,7 @@ export const ROOT = path.resolve(HERE, "..");
 export const PAGES = [
   { source: "README.md", output: "index.html", label: "Home" },
   { source: "docs/faq.md", output: "faq.html", label: "FAQ" },
+  { source: "docs/troubleshooting.md", output: "troubleshooting.html", label: "Troubleshooting" },
   { source: "docs/rules.md", output: "rules.html", label: "Rules" },
   { source: "docs/json-report.md", output: "json-report.html", label: "JSON report" },
   {
