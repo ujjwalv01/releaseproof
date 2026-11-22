@@ -75082,9 +75082,20 @@ function diffReport(diff) {
     problems: diff.problems
   };
 }
-function chooseSource(provenance, options) {
+var HEX_COMMIT_RE = /^[0-9a-f]{40}$/i;
+function chooseSource(provenance, options, log) {
   const certified = sourceFromProvenance(provenance);
   if (certified) {
+    const rawCommit = options.commit?.trim();
+    if (rawCommit) {
+      if (!HEX_COMMIT_RE.test(rawCommit)) {
+        log?.(`provenance certifies ${certified.commit.slice(0, 7)}; --commit is not used`);
+      } else if (rawCommit.toLowerCase() !== certified.commit.toLowerCase()) {
+        log?.(
+          `provenance certifies ${certified.commit.slice(0, 7)}; --commit ${rawCommit.toLowerCase().slice(0, 7)} is not used`
+        );
+      }
+    }
     return certified;
   }
   if (options.commit) {
@@ -75185,7 +75196,7 @@ async function runCheck(options, deps = defaultDeps) {
   log(
     `provenance: ${provenance.status}${provenance.attestationSource === "rekor" ? " (from Rekor)" : ""}`
   );
-  const source = chooseSource(provenance, options);
+  const source = chooseSource(provenance, options, log);
   const release = readTarball(artifact.tarball);
   let rebuild;
   let rebuilt;
