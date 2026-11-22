@@ -244,6 +244,47 @@ Verdict: MATCHES SOURCE: 9 files identical to a clean build of sigstore/sigstore
     expect(text).toContain("\n         1 critical and 2 high finding(s)");
   });
 
+  it("omits diff body lines when maxPatchLines is 0 and omits truncation when maxPatchLines covers the patch", () => {
+    const patch = [
+      "--- rebuild/lib/greet.js",
+      "+++ release/lib/greet.js",
+      "@@ -1,3 +1,4 @@",
+      " a",
+      "+  const beacon = 1;",
+      " b",
+    ].join("\n");
+    const sample = report({
+      verdict: {
+        status: "differs-from-source",
+        exitCode: 1,
+        summary: "DIFFERS FROM SOURCE",
+        reasons: ["files differ"],
+        counts: { critical: 0, high: 1, medium: 0, low: 0, info: 0 },
+        findings: [
+          {
+            id: "file-changed",
+            severity: "high",
+            title: "1 file differs from the source",
+            detail: "Not what a clean build produces.",
+            paths: ["lib/greet.js"],
+            evidence: { patches: { "lib/greet.js": patch } },
+          },
+        ],
+      },
+    });
+
+    const zero = formatReport(sample, { maxPatchLines: 0 });
+    expect(zero).toContain("            --- lib/greet.js\n            … 4 lines (see --json)\n");
+    expect(zero).not.toContain("@@ -1,3 +1,4 @@");
+
+    const full = formatReport(sample, { maxPatchLines: 100 });
+    expect(full).toContain(
+      "            --- lib/greet.js\n            @@ -1,3 +1,4 @@\n             a\n            +  const beacon = 1;\n             b\n",
+    );
+    expect(full).not.toContain("more lines");
+    expect(full).not.toContain("see --json");
+  });
+
   it("explains a could-not-verify with the failing stage's output", () => {
     const text = formatReport(
       report({

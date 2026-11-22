@@ -27,6 +27,7 @@ export interface CheckCommandOptions {
   keepVolume?: boolean | undefined;
   json?: boolean | undefined;
   report?: string | undefined;
+  patchLines?: string | undefined;
   quiet?: boolean | undefined;
 }
 
@@ -48,6 +49,24 @@ function parseNodeMajor(value: string | undefined): number | undefined {
     throw new ToolError(`--node expects a Node.js major version such as 22, got "${value}"`);
   }
   return major;
+}
+
+function parsePatchLines(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!/^\d+$/.test(value)) {
+    throw new ToolError(
+      `--patch-lines expects a whole number 0 or more, got ${JSON.stringify(value)}`,
+    );
+  }
+  const count = Number(value);
+  if (!Number.isSafeInteger(count)) {
+    throw new ToolError(
+      `--patch-lines expects a whole number 0 or more, got ${JSON.stringify(value)}`,
+    );
+  }
+  return count;
 }
 
 function reportWriteError(filePath: string, error: unknown): ToolError {
@@ -113,6 +132,7 @@ export async function runCheckCommand(
   }
   try {
     const reportPath = validateReportPath(options.report);
+    const maxPatchLines = parsePatchLines(options.patchLines);
     const report = await deps.runCheck({
       spec,
       stageId: options.stage,
@@ -134,7 +154,11 @@ export async function runCheckCommand(
     if (reportPath !== undefined && jsonReport !== undefined) {
       writeReportFile(reportPath, jsonReport);
     }
-    io.stdout(options.json && jsonReport !== undefined ? jsonReport : formatReport(report));
+    io.stdout(
+      options.json && jsonReport !== undefined
+        ? jsonReport
+        : formatReport(report, maxPatchLines === undefined ? {} : { maxPatchLines }),
+    );
     return report.verdict.exitCode;
   } catch (error) {
     if (error instanceof ToolError) {

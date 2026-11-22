@@ -182,7 +182,9 @@ function findingLines(finding: Finding, options: FormatOptions): string {
       out += `            ${line}\n`;
     }
     if (lines.length - 2 > maxPatchLines) {
-      out += `            … ${lines.length - 2 - maxPatchLines} more lines (see --json)\n`;
+      const remaining = lines.length - 2 - maxPatchLines;
+      const noun = maxPatchLines === 0 ? "lines" : "more lines";
+      out += `            … ${remaining} ${noun} (see --json)\n`;
     }
   }
   return out;

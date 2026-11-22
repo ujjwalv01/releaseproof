@@ -430,3 +430,103 @@ describe("runCheckCommand with --report", () => {
     expect(() => readFileSync(reportPath, "utf8")).toThrow();
   });
 });
+
+describe("runCheckCommand with --patch-lines", () => {
+  function reportWithPatch(): CheckReport {
+    const patch = [
+      "--- rebuild/lib/index.js",
+      "+++ release/lib/index.js",
+      "@@ -1,8 +1,8 @@",
+      "-const a = 1;",
+      "+const a = 2;",
+      " const b = 2;",
+      " const c = 3;",
+      " const d = 4;",
+      " const e = 5;",
+      " const f = 6;",
+      " const g = 7;",
+    ].join("\n");
+    const base = fakeReport(1);
+    return {
+      ...base,
+      verdict: {
+        ...base.verdict,
+        counts: { critical: 0, high: 1, medium: 0, low: 0, info: 0 },
+        findings: [
+          {
+            id: "file-changed",
+            severity: "high",
+            title: "1 file differs from the source",
+            detail: "Not what a clean build produces.",
+            paths: ["lib/index.js"],
+            evidence: { patches: { "lib/index.js": patch } },
+          },
+        ],
+      },
+    };
+  }
+
+  it("shows at most 5 diff lines per file and then the more-lines footer for --patch-lines 5", async () => {
+    const runCheck = vi.fn(async () => reportWithPatch());
+    const streams = io();
+
+    const code = await runCheckCommand("x@1.0.0", { patchLines: "5", quiet: true }, streams.io, {
+      runCheck,
+    });
+
+    expect(code).toBe(1);
+    const out = streams.out.join("");
+    expect(out).toContain("            --- lib/index.js\n");
+    expect(out).toContain("            @@ -1,8 +1,8 @@\n");
+    expect(out).toContain("             const c = 3;\n");
+    expect(out).not.toContain("             const d = 4;\n");
+    expect(out).toContain("            … 4 more lines (see --json)\n");
+  });
+
+  it("shows no diff lines while naming each changed file for --patch-lines 0", async () => {
+    const runCheck = vi.fn(async () => reportWithPatch());
+    const streams = io();
+
+    const code = await runCheckCommand("x@1.0.0", { patchLines: "0", quiet: true }, streams.io, {
+      runCheck,
+    });
+
+    expect(code).toBe(1);
+    const out = streams.out.join("");
+    expect(out).toContain("            --- lib/index.js\n            … 9 lines (see --json)\n");
+    expect(out).not.toContain("@@ -1,8 +1,8 @@");
+    expect(out).not.toContain("const a");
+  });
+
+  it("shows the whole patch with no truncation line for a large --patch-lines value", async () => {
+    const runCheck = vi.fn(async () => reportWithPatch());
+    const streams = io();
+
+    const code = await runCheckCommand("x@1.0.0", { patchLines: "500", quiet: true }, streams.io, {
+      runCheck,
+    });
+
+    expect(code).toBe(1);
+    const out = streams.out.join("");
+    expect(out).toContain("             const g = 7;\n");
+    expect(out).not.toContain("more lines");
+    expect(out).not.toContain("see --json");
+  });
+
+  it.each(["", "   ", "-1", "1.5", "abc", "0x10", "1e2", "+5"])(
+    "rejects invalid --patch-lines value %j before running a check",
+    async (patchLines) => {
+      const runCheck = vi.fn(async () => fakeReport(0));
+      const streams = io();
+
+      const code = await runCheckCommand("x@1.0.0", { patchLines }, streams.io, { runCheck });
+
+      expect(code).toBe(2);
+      expect(runCheck).not.toHaveBeenCalled();
+      expect(streams.out).toEqual([]);
+      expect(streams.err).toEqual([
+        `error: --patch-lines expects a whole number 0 or more, got ${JSON.stringify(patchLines)}\n`,
+      ]);
+    },
+  );
+});

@@ -83,7 +83,8 @@ to rebuild from when there is no provenance), `--registry <url>` to select the r
 memory limit (default `4g`; big TypeScript builds may need more), `--json` for the full report on
 stdout, `--report <path>` to also write the JSON report to a file (the path is taken as given and
 parent directories are created; fields are described in [docs/json-report.md](./docs/json-report.md)),
-`--offline` to skip refreshing the Sigstore trust root, `--quiet` to suppress progress on
+`--patch-lines <n>` to choose how many diff lines to show per changed file in the text report
+(default `40`; `0` for none), `--offline` to skip refreshing the Sigstore trust root, `--quiet` to suppress progress on
 stderr, `--keep-volume` to inspect the build afterwards. Every rule and severity is
 documented in [docs/rules.md](./docs/rules.md).
 

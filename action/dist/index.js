@@ -75411,7 +75411,9 @@ function findingLines(finding, options) {
 `;
     }
     if (lines.length - 2 > maxPatchLines) {
-      out += `            \u2026 ${lines.length - 2 - maxPatchLines} more lines (see --json)
+      const remaining = lines.length - 2 - maxPatchLines;
+      const noun = maxPatchLines === 0 ? "lines" : "more lines";
+      out += `            \u2026 ${remaining} ${noun} (see --json)
 `;
     }
   }

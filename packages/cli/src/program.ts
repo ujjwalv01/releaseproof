@@ -43,6 +43,10 @@ export function createProgram(): Command {
       "--report <path>",
       "write the full JSON report to <path> alongside stdout (path is taken as given)",
     )
+    .option(
+      "--patch-lines <n>",
+      "diff lines to show per changed file in the text report, 0 for none (default: 40; has no effect with --json)",
+    )
     .option("--quiet", "no progress output on stderr")
     .addHelpText(
       "after",
