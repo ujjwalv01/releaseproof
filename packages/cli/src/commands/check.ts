@@ -131,8 +131,8 @@ export async function runCheckCommand(
     );
   }
   try {
-    const reportPath = validateReportPath(options.report);
     const maxPatchLines = parsePatchLines(options.patchLines);
+    const reportPath = validateReportPath(options.report);
     const report = await deps.runCheck({
       spec,
       stageId: options.stage,
