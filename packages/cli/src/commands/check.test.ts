@@ -95,8 +95,22 @@ describe("runCheckCommand", () => {
     const { err, io: streams } = io();
     expect(await runCheckCommand("x@1.0.0", {}, streams, { runCheck })).toBe(2);
     expect(err).toEqual(["error: Docker is not available\n"]);
-    expect(await runCheckCommand("x@1.0.0", { node: "twenty" }, streams, { runCheck })).toBe(2);
-    expect(err[1]).toMatch(/--node expects a Node.js major version/);
+    for (const badNode of [
+      "twenty",
+      "0x16",
+      "0b10110",
+      "1e1",
+      "22.0",
+      "+22",
+      "-22",
+      "9",
+      "41",
+      "",
+    ]) {
+      const s = io();
+      expect(await runCheckCommand("x@1.0.0", { node: badNode }, s.io, { runCheck })).toBe(2);
+      expect(s.err[0]).toMatch(/--node must be a Node\.js major version/);
+    }
   });
 
   it("with --json a ToolError prints one error object to stdout and keeps the stderr line", async () => {

@@ -73434,6 +73434,20 @@ function validateImageReference(image, inputName = "--image") {
   }
   return image;
 }
+function parseNodeMajorOption(value, inputName = "--node") {
+  if (value === void 0) return void 0;
+  const trimmed = value.trim();
+  if (inputName !== "--node" && trimmed === "") return void 0;
+  if (/^\d{1,2}$/.test(trimmed)) {
+    const major = Number(trimmed);
+    if (major >= 10 && major <= 40) {
+      return major;
+    }
+  }
+  throw new ToolError(
+    `${inputName} must be a Node.js major version such as 22, got ${JSON.stringify(value)}`
+  );
+}
 var PACK_TIME_SCRIPTS = [
   "prepack",
   "prepare",
@@ -75513,13 +75527,7 @@ function parseInputs(getInput2, context4) {
   if (commitInput && !/^[0-9a-f]{40}$/.test(commitInput)) {
     throw new ToolError(`Input "commit" must be a full 40-character SHA, got "${commitInput}"`);
   }
-  const nodeInput = getInput2("node").trim();
-  const nodeMajor = nodeInput ? Number(nodeInput) : void 0;
-  if (nodeMajor !== void 0 && (!Number.isInteger(nodeMajor) || nodeMajor < 10 || nodeMajor > 40)) {
-    throw new ToolError(
-      `Input "node" must be a Node.js major version such as 22, got "${nodeInput}"`
-    );
-  }
+  const nodeMajor = parseNodeMajorOption(getInput2("node"), 'Input "node"');
   const memoryInput = parseMemoryLimit(getInput2("memory"), 'Input "memory"');
   const imageInput = getInput2("image");
   const failOnInput = getInput2("fail-on").trim() || "non-zero";

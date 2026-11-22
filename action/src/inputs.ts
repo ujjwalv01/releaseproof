@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   parseMemoryLimit,
+  parseNodeMajorOption,
   parseSpec,
   STAGE_ID_RE,
   ToolError,
@@ -119,16 +120,7 @@ export function parseInputs(getInput: GetInput, context: ActionContext): ActionI
   if (commitInput && !/^[0-9a-f]{40}$/.test(commitInput)) {
     throw new ToolError(`Input "commit" must be a full 40-character SHA, got "${commitInput}"`);
   }
-  const nodeInput = getInput("node").trim();
-  const nodeMajor = nodeInput ? Number(nodeInput) : undefined;
-  if (
-    nodeMajor !== undefined &&
-    (!Number.isInteger(nodeMajor) || nodeMajor < 10 || nodeMajor > 40)
-  ) {
-    throw new ToolError(
-      `Input "node" must be a Node.js major version such as 22, got "${nodeInput}"`,
-    );
-  }
+  const nodeMajor = parseNodeMajorOption(getInput("node"), 'Input "node"');
   const memoryInput = parseMemoryLimit(getInput("memory"), 'Input "memory"');
   const imageInput = getInput("image");
   const failOnInput = (getInput("fail-on").trim() || "non-zero") as FailOn;
