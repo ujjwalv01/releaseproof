@@ -6,6 +6,7 @@ import {
   build,
   CONTENT_SECURITY_POLICY,
   checkLinks,
+  escapeHtml,
   PAGES,
   pageUrl,
   REPOSITORY,
@@ -192,11 +193,13 @@ describe("build", () => {
       const expectedUrl = pageUrl(entry);
 
       expect(html.match(/<link rel="canonical" href="[^"]+">/g)).toEqual([
-        `<link rel="canonical" href="${expectedUrl}">`,
+        `<link rel="canonical" href="${escapeHtml(expectedUrl)}">`,
       ]);
-      expect(html).toContain(`<meta property="og:title" content="${expectedTitle}">`);
-      expect(html).toContain(`<meta property="og:description" content="${expectedDescription}">`);
-      expect(html).toContain(`<meta property="og:url" content="${expectedUrl}">`);
+      expect(html).toContain(`<meta property="og:title" content="${escapeHtml(expectedTitle)}">`);
+      expect(html).toContain(
+        `<meta property="og:description" content="${escapeHtml(expectedDescription)}">`,
+      );
+      expect(html).toContain(`<meta property="og:url" content="${escapeHtml(expectedUrl)}">`);
       expect(html).toContain('<meta property="og:type" content="website">');
       expect(html).toContain('<meta property="og:site_name" content="releaseproof">');
     }
