@@ -167,7 +167,28 @@ describe("build", () => {
 
   it("gives every rule its own anchor on the rules page", () => {
     const rules = page("rules.html");
-    for (const id of ["dependency-added", "unexpected-path", "file-changed"]) {
+    const doc = readFileSync(path.join(ROOT, "docs/rules.md"), "utf8");
+    const ids = [];
+    let inRuleTable = false;
+    for (const line of doc.split("\n")) {
+      if (!line.startsWith("|")) {
+        inRuleTable = false;
+        continue;
+      }
+      const first = line.split("|")[1]?.trim() ?? "";
+      if (first === "Id") {
+        inRuleTable = true;
+        continue;
+      }
+      if (!inRuleTable || /^-+$/.test(first)) {
+        continue;
+      }
+      for (const match of first.matchAll(/`([^`]+)`/g)) {
+        ids.push(match[1]);
+      }
+    }
+    expect(ids.length).toBeGreaterThan(30);
+    for (const id of ids) {
       expect(rules).toContain(`<code id="${id}">`);
     }
   });

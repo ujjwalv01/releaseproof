@@ -75572,6 +75572,11 @@ var HEADINGS = {
   "differs-from-source": "\u{1F6A8} DIFFERS FROM SOURCE",
   "could-not-verify": "\u26A0\uFE0F COULD NOT VERIFY"
 };
+var RULES_URL = "https://ujjwalv01.github.io/releaseproof/rules.html";
+var KEBAB_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+function ruleUrl(id) {
+  return KEBAB_ID.test(id) ? `${RULES_URL}#${id}` : RULES_URL;
+}
 function findingBullets(findings) {
   const groups = /* @__PURE__ */ new Map();
   for (const { id, severity } of sortFindings(findings)) {
@@ -75583,7 +75588,7 @@ function findingBullets(findings) {
     }
   }
   return [...groups].map(
-    ([id, { severity, count: count3 }]) => `- **${severity}** [\`${id}\`](https://github.com/ujjwalv01/releaseproof/blob/main/docs/rules.md)${count3 > 1 ? ` (${count3})` : ""}
+    ([id, { severity, count: count3 }]) => `- **${severity}** [\`${id}\`](${ruleUrl(id)})${count3 > 1 ? ` (${count3})` : ""}
 `
   );
 }

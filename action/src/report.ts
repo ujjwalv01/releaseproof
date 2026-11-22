@@ -33,6 +33,13 @@ const HEADINGS = {
   "could-not-verify": "⚠️ COULD NOT VERIFY",
 } as const;
 
+export const RULES_URL = "https://ujjwalv01.github.io/releaseproof/rules.html";
+const KEBAB_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+
+function ruleUrl(id: string): string {
+  return KEBAB_ID.test(id) ? `${RULES_URL}#${id}` : RULES_URL;
+}
+
 function findingBullets(findings: Finding[]): string[] {
   const groups = new Map<string, { severity: Finding["severity"]; count: number }>();
   for (const { id, severity } of sortFindings(findings)) {
@@ -46,7 +53,7 @@ function findingBullets(findings: Finding[]): string[] {
   }
   return [...groups].map(
     ([id, { severity, count }]) =>
-      `- **${severity}** [\`${id}\`](https://github.com/ujjwalv01/releaseproof/blob/main/docs/rules.md)${count > 1 ? ` (${count})` : ""}\n`,
+      `- **${severity}** [\`${id}\`](${ruleUrl(id)})${count > 1 ? ` (${count})` : ""}\n`,
   );
 }
 
