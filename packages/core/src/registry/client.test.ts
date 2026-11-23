@@ -20,6 +20,30 @@ describe("normalizeRegistry", () => {
     expect(normalizeRegistry("https://npm.example.com/npm")).toBe("https://npm.example.com/npm/");
   });
 
+  it.each([
+    ["https://host/", "https://host/"],
+    ["https://host/npm/", "https://host/npm/"],
+    ["https://host/npm", "https://host/npm/"],
+  ])("preserves valid registry URL %j", (input, expected) => {
+    expect(normalizeRegistry(input)).toBe(expected);
+  });
+
+  it.each(["https://alice:s3cret@host/", "https://alice@host/", "https://:s3cret@host/"])(
+    "rejects credentials in %j",
+    (input) => {
+      let error: unknown;
+      try {
+        normalizeRegistry(input);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(ToolError);
+      expect((error as Error).message).not.toContain("alice");
+      expect((error as Error).message).not.toContain("s3cret");
+      expect((error as Error).message).not.toContain(input);
+    },
+  );
+
   it("drops query and hash", () => {
     expect(normalizeRegistry("https://npm.example.com/?x=1#y")).toBe("https://npm.example.com/");
   });
@@ -45,6 +69,21 @@ describe("registryUrl", () => {
 });
 
 describe("registryJson", () => {
+  it.each(["https://alice:s3cret@host/", "https://alice@host/", "https://:s3cret@host/"])(
+    "rejects credential-bearing registry URL %j before fetch",
+    async (registry) => {
+      const mock = fetchReturning(new Response("{}", { status: 200 }));
+      const error = await registryJson("/x", { registry, fetch: asFetch(mock) }).catch(
+        (caught: unknown) => caught,
+      );
+      expect(error).toBeInstanceOf(ToolError);
+      expect((error as Error).message).not.toContain("alice");
+      expect((error as Error).message).not.toContain("s3cret");
+      expect((error as Error).message).not.toContain(registry);
+      expect(mock).not.toHaveBeenCalled();
+    },
+  );
+
   it("sends the token and accept header and parses JSON", async () => {
     const mock = fetchReturning(new Response(JSON.stringify({ ok: 1 }), { status: 200 }));
     await expect(
@@ -125,7 +164,12 @@ describe.each(["JSON", "tarball"] as const)("%s registry token transport", (kind
       const mock = fetchReturning(new Response("{}"));
       const error = await load(registry, "npm_test_secret", mock).catch((error: unknown) => error);
       expect(error).toBeInstanceOf(ToolError);
-      expect(error).toMatchObject({ message: expect.stringContaining("https://") });
+      if (registry.includes("@")) {
+        expect((error as Error).message).toContain("***@npm.example.com/");
+        expect((error as Error).message).not.toContain("user:");
+      } else {
+        expect((error as Error).message).toContain("https://");
+      }
       expect((error as Error).message).not.toContain("npm_test_secret");
       expect(mock).not.toHaveBeenCalled();
     },

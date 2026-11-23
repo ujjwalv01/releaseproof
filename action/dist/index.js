@@ -64225,7 +64225,12 @@ function normalizeRegistry(registry = DEFAULT_REGISTRY) {
   try {
     url = new URL(registry);
   } catch {
-    throw new ToolError(`Invalid registry URL "${registry}"`);
+    throw new ToolError("Invalid registry URL");
+  }
+  if (url.username !== "" || url.password !== "") {
+    throw new ToolError(
+      `Registry URL must not contain a user name or password (${url.protocol}//***@${url.host}${url.pathname}); give the token with NPM_TOKEN, --token or .npmrc instead`
+    );
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new ToolError(`Registry URL must use http(s): "${registry}"`);
