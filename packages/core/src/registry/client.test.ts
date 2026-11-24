@@ -28,21 +28,23 @@ describe("normalizeRegistry", () => {
     expect(normalizeRegistry(input)).toBe(expected);
   });
 
-  it.each(["https://alice:s3cret@host/", "https://alice@host/", "https://:s3cret@host/"])(
-    "rejects credentials in %j",
-    (input) => {
-      let error: unknown;
-      try {
-        normalizeRegistry(input);
-      } catch (caught) {
-        error = caught;
-      }
-      expect(error).toBeInstanceOf(ToolError);
-      expect((error as Error).message).not.toContain("alice");
-      expect((error as Error).message).not.toContain("s3cret");
-      expect((error as Error).message).not.toContain(input);
-    },
-  );
+  it.each([
+    "https://alice:s3cret@host/",
+    "https://alice@host/",
+    "https://:s3cret@host/",
+    "alice:s3cret@host",
+  ])("rejects credentials in %j", (input) => {
+    let error: unknown;
+    try {
+      normalizeRegistry(input);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ToolError);
+    expect((error as Error).message).not.toContain("alice");
+    expect((error as Error).message).not.toContain("s3cret");
+    expect((error as Error).message).not.toContain(input);
+  });
 
   it("drops query and hash", () => {
     expect(normalizeRegistry("https://npm.example.com/?x=1#y")).toBe("https://npm.example.com/");
@@ -69,20 +71,22 @@ describe("registryUrl", () => {
 });
 
 describe("registryJson", () => {
-  it.each(["https://alice:s3cret@host/", "https://alice@host/", "https://:s3cret@host/"])(
-    "rejects credential-bearing registry URL %j before fetch",
-    async (registry) => {
-      const mock = fetchReturning(new Response("{}", { status: 200 }));
-      const error = await registryJson("/x", { registry, fetch: asFetch(mock) }).catch(
-        (caught: unknown) => caught,
-      );
-      expect(error).toBeInstanceOf(ToolError);
-      expect((error as Error).message).not.toContain("alice");
-      expect((error as Error).message).not.toContain("s3cret");
-      expect((error as Error).message).not.toContain(registry);
-      expect(mock).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    "https://alice:s3cret@host/",
+    "https://alice@host/",
+    "https://:s3cret@host/",
+    "alice:s3cret@host",
+  ])("rejects credential-bearing registry URL %j before fetch", async (registry) => {
+    const mock = fetchReturning(new Response("{}", { status: 200 }));
+    const error = await registryJson("/x", { registry, fetch: asFetch(mock) }).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(ToolError);
+    expect((error as Error).message).not.toContain("alice");
+    expect((error as Error).message).not.toContain("s3cret");
+    expect((error as Error).message).not.toContain(registry);
+    expect(mock).not.toHaveBeenCalled();
+  });
 
   it("sends the token and accept header and parses JSON", async () => {
     const mock = fetchReturning(new Response(JSON.stringify({ ok: 1 }), { status: 200 }));

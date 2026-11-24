@@ -31,7 +31,7 @@ export function normalizeRegistry(registry: string = DEFAULT_REGISTRY): string {
     );
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new ToolError(`Registry URL must use http(s): "${registry}"`);
+    throw new ToolError("Registry URL must start with https:// or http://");
   }
   if (!url.pathname.endsWith("/")) {
     url.pathname = `${url.pathname}/`;
