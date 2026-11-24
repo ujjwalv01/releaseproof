@@ -115,8 +115,8 @@ listed directories in the repository at that commit.
 
 **Message as printed:** `<name> at <dir> is marked private`
 
-**What it means:** The matched `package.json` has `"private": true`, which npm refuses to pack
-or publish directly. Some projects strip `"private": true` or generate a separate manifest in a
+**What it means:** The matched `package.json` has `"private": true`, which npm refuses to
+publish. Some projects strip `"private": true` or generate a separate manifest in a
 custom release script.
 
 **What to try:** Verify that `--commit` points to the exact release commit, or check whether the
