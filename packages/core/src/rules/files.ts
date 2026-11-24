@@ -20,13 +20,14 @@ const UNEXPECTED_PATHS: Array<{ pattern: RegExp; why: string }> = [
   },
   { pattern: /^\.git\//, why: "a .git directory inside a package is never intentional" },
   {
-    pattern: /^\.(env|npmrc|yarnrc|yarnrc\.yml)$/,
+    pattern:
+      /^\.(yarnrc|yarnrc\.yml)$|(^|\/)(\.npmrc|\.env(\.(?!example$|sample$|template$)[^/]+)?)$/,
     why: "config files that can carry credentials or change how tools behave",
   },
   { pattern: /^\.husky\//, why: "git hooks run commands" },
   {
     pattern:
-      /\.(pem|key|p12|pfx)$|(^|\/)(id_rsa|\.git-credentials|\.netrc)$|(^|\/)\.(ssh|aws|kube)\/|(^|\/)\.docker\/config\.json$/i,
+      /\.(pem|key|p12|pfx)$|(^|\/)(id_(rsa|dsa|ecdsa|ed25519)(_sk)?|\.git-credentials|\.netrc)$|(^|\/)\.(ssh|aws|kube)\/|(^|\/)\.docker\/config\.json$/i,
     why: "private keys and credential files must never ship in a package",
   },
 ];

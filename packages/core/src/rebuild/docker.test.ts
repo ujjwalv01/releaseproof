@@ -6,10 +6,10 @@ describe("parseMemoryLimit", () => {
   it.each([
     ["4g", "4g"],
     ["6144m", "6144m"],
-    ["512", "512"],
-    ["512K", "512k"],
+    ["6m", "6m"],
+    ["6144K", "6144k"],
+    [" 4G ", "4g"],
     [" 6G ", "6g"],
-    ["0", "0"],
     ["", undefined],
     ["   ", undefined],
     [undefined, undefined],
@@ -17,14 +17,29 @@ describe("parseMemoryLimit", () => {
     expect(parseMemoryLimit(memory)).toBe(expected);
   });
 
-  it.each(["4gb", "four", "-1g", "1.5g", "4g --privileged", "4g; echo unsafe", "4g\0", "4\n2g"])(
-    "rejects %j as a tool error",
-    (memory) => {
-      expect(() => parseMemoryLimit(memory)).toThrow(
-        new ToolError(`--memory must be a Docker size such as 4g or 6144m, got "${memory}"`),
-      );
-    },
-  );
+  it.each([
+    "0",
+    "0g",
+    "0m",
+    "5m",
+    "4096",
+    "512",
+    "1k",
+    "512K",
+    "4gb",
+    "four",
+    "-1g",
+    "1.5g",
+    "4g --privileged",
+    "4g; echo unsafe",
+    "4g\0",
+    "4\n2g",
+  ])("rejects %j as a tool error", (memory) => {
+    const normalized = memory.trim().toLowerCase();
+    expect(() => parseMemoryLimit(memory)).toThrow(
+      new ToolError(`--memory must be a Docker size such as 4g or 6144m, got "${normalized}"`),
+    );
+  });
 });
 
 const spec: ContainerSpec = {

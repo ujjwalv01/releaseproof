@@ -13,8 +13,9 @@ name: Automerge
 # treats everything it reads from the pull request as data. Keep it that way: never add a
 # checkout of the head ref, a build step, or a shell command that contains pull request text.
 #
-# A merge made with this token starts no "push" workflows. The script starts the website
-# deploy itself; the release workflow (Version Packages PR) runs on the next ordinary push.
+# A merge made with this token starts no "push" workflows, and GitHub does not close the
+# issues the pull request says it closes. The script starts the website deploy and closes
+# those issues itself; the release workflow (Version Packages PR) runs on the next ordinary push.
 on:
   pull_request_target:
     types: [labeled, synchronize, edited, ready_for_review]
@@ -26,6 +27,13 @@ on:
 
 permissions: {}
 
+# One run per pull request at a time. Adding several labels at once sends one event per
+# label, and two runs merging the same head race each other. A waiting run may be replaced
+# by a newer one; that is fine, because every run decides from the current state.
+concurrency:
+  group: automerge-${{ github.event.pull_request.number || 'ci' }}
+  cancel-in-progress: false
+
 jobs:
   automerge:
     if: >-
@@ -36,7 +44,7 @@ jobs:
     permissions:
       contents: write # merge the pull request
       pull-requests: write # comment, take the label off
-      issues: read # list the labelled pull requests and their label events
+      issues: write # list the labelled pull requests and their label events; close the issues a merged one closes
       actions: write # read the CI runs of the head commit; start the website deploy after a merge
       checks: read # check runs of the head commit
       statuses: read # commit statuses of the head commit

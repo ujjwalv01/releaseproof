@@ -139,10 +139,13 @@ describe("runAction", () => {
       spec: "releaseproof@1.2.3",
       repository: "https://github.com/ujjwalv01/releaseproof",
       commit: sha,
+      rekor: true,
     });
     expect(io.outputs).toMatchObject({
       verdict: "differs-from-source",
       "exit-code": "1",
+      findings: "0",
+      "highest-severity": "none",
       "report-path": "releaseproof-report.json",
     });
     expect(JSON.parse(io.files["releaseproof-report.json"] ?? "{}")).toMatchObject({
@@ -151,6 +154,40 @@ describe("runAction", () => {
     expect(io.summaries[0]).toContain("## 🚨 DIFFERS FROM SOURCE — `releaseproof@1.2.3`");
     expect(io.failures).toEqual(["DIFFERS-FROM-SOURCE: because"]);
     expect(io.issues).toEqual([]);
+  });
+
+  it("sets findings count and highest-severity from sorted findings", async () => {
+    const report = reportWith("differs-from-source", 1);
+    report.verdict.findings = [
+      {
+        id: "readme-changed",
+        severity: "low",
+        title: "Changed non-code file",
+        detail: "README.md changed",
+        paths: ["package/README.md"],
+      },
+      {
+        id: "file-added",
+        severity: "high",
+        title: "Added executable file",
+        detail: "package/extra.js added",
+        paths: ["package/extra.js"],
+      },
+      {
+        id: "file-changed",
+        severity: "high",
+        title: "Modified executable file",
+        detail: "package/index.js changed",
+        paths: ["package/index.js"],
+      },
+    ];
+    report.verdict.counts = { critical: 0, high: 2, medium: 0, low: 1, info: 0 };
+
+    const { io, actionIo } = fakeIo({}, async () => report);
+    await runAction(actionIo);
+
+    expect(io.outputs.findings).toBe("3");
+    expect(io.outputs["highest-severity"]).toBe("high");
   });
 
   it("opens an issue when asked and the verdict is not a match", async () => {
@@ -214,6 +251,8 @@ describe("runAction", () => {
       "exit-code": "2",
       summary: "Docker is not available",
     });
+    expect(broken.io.outputs.findings).toBeUndefined();
+    expect(broken.io.outputs["highest-severity"]).toBeUndefined();
     expect(broken.io.summaries).toHaveLength(1);
     expect(broken.io.summaries[0]).toContain("## ⚠️ COULD NOT VERIFY — the check itself failed");
     expect(broken.io.summaries[0]).toContain("```text\nDocker is not available\n```");

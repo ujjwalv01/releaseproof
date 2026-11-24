@@ -64225,10 +64225,15 @@ function normalizeRegistry(registry = DEFAULT_REGISTRY) {
   try {
     url = new URL(registry);
   } catch {
-    throw new ToolError(`Invalid registry URL "${registry}"`);
+    throw new ToolError("Invalid registry URL");
+  }
+  if (url.username !== "" || url.password !== "") {
+    throw new ToolError(
+      `Registry URL must not contain a user name or password (${url.protocol}//***@${url.host}${url.pathname}); give the token with NPM_TOKEN, --token or .npmrc instead`
+    );
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new ToolError(`Registry URL must use http(s): "${registry}"`);
+    throw new ToolError("Registry URL must start with https:// or http://");
   }
   if (!url.pathname.endsWith("/")) {
     url.pathname = `${url.pathname}/`;
@@ -73205,10 +73210,21 @@ var {
 } = getIpcExport();
 
 // ../packages/core/src/rebuild/docker.ts
+var MIN_MEMORY_BYTES = 6 * 1024 * 1024;
+var MEMORY_UNIT_BYTES = {
+  k: 1024,
+  m: 1024 * 1024,
+  g: 1024 * 1024 * 1024
+};
 function parseMemoryLimit(value, inputName = "--memory") {
   const memory = value?.trim().toLowerCase();
   if (!memory) return void 0;
-  if (!/^\d+[kmg]?$/.test(memory)) {
+  const match = /^(\d+)([kmg])$/.exec(memory);
+  if (!match) {
+    throw new ToolError(`${inputName} must be a Docker size such as 4g or 6144m, got "${memory}"`);
+  }
+  const bytes = Number(match[1]) * (MEMORY_UNIT_BYTES[match[2]] ?? 0);
+  if (!Number.isFinite(bytes) || bytes < MIN_MEMORY_BYTES) {
     throw new ToolError(`${inputName} must be a Docker size such as 4g or 6144m, got "${memory}"`);
   }
   return memory;
@@ -73433,6 +73449,20 @@ function validateImageReference(image, inputName = "--image") {
     );
   }
   return image;
+}
+function parseNodeMajorOption(value, inputName = "--node") {
+  if (value === void 0) return void 0;
+  const trimmed = value.trim();
+  if (inputName !== "--node" && trimmed === "") return void 0;
+  if (/^\d{1,2}$/.test(trimmed)) {
+    const major = Number(trimmed);
+    if (major >= 10 && major <= 40) {
+      return major;
+    }
+  }
+  throw new ToolError(
+    `${inputName} must be a Node.js major version such as 22, got ${JSON.stringify(value)}`
+  );
 }
 var PACK_TIME_SCRIPTS = [
   "prepack",
@@ -74254,12 +74284,12 @@ var UNEXPECTED_PATHS = [
   },
   { pattern: /^\.git\//, why: "a .git directory inside a package is never intentional" },
   {
-    pattern: /^\.(env|npmrc|yarnrc|yarnrc\.yml)$/,
+    pattern: /^\.(yarnrc|yarnrc\.yml)$|(^|\/)(\.npmrc|\.env(\.(?!example$|sample$|template$)[^/]+)?)$/,
     why: "config files that can carry credentials or change how tools behave"
   },
   { pattern: /^\.husky\//, why: "git hooks run commands" },
   {
-    pattern: /\.(pem|key|p12|pfx)$|(^|\/)(id_rsa|\.git-credentials|\.netrc)$|(^|\/)\.(ssh|aws|kube)\/|(^|\/)\.docker\/config\.json$/i,
+    pattern: /\.(pem|key|p12|pfx)$|(^|\/)(id_(rsa|dsa|ecdsa|ed25519)(_sk)?|\.git-credentials|\.netrc)$|(^|\/)\.(ssh|aws|kube)\/|(^|\/)\.docker\/config\.json$/i,
     why: "private keys and credential files must never ship in a package"
   }
 ];
@@ -75082,9 +75112,20 @@ function diffReport(diff) {
     problems: diff.problems
   };
 }
-function chooseSource(provenance, options) {
+var HEX_COMMIT_RE = /^[0-9a-f]{40}$/i;
+function chooseSource(provenance, options, log) {
   const certified = sourceFromProvenance(provenance);
   if (certified) {
+    const rawCommit = options.commit?.trim();
+    if (rawCommit) {
+      if (!HEX_COMMIT_RE.test(rawCommit)) {
+        log?.(`provenance certifies ${certified.commit.slice(0, 7)}; --commit is not used`);
+      } else if (rawCommit.toLowerCase() !== certified.commit.toLowerCase()) {
+        log?.(
+          `provenance certifies ${certified.commit.slice(0, 7)}; --commit ${rawCommit.toLowerCase().slice(0, 7)} is not used`
+        );
+      }
+    }
     return certified;
   }
   if (options.commit) {
@@ -75185,7 +75226,7 @@ async function runCheck(options, deps = defaultDeps) {
   log(
     `provenance: ${provenance.status}${provenance.attestationSource === "rekor" ? " (from Rekor)" : ""}`
   );
-  const source = chooseSource(provenance, options);
+  const source = chooseSource(provenance, options, log);
   const release = readTarball(artifact.tarball);
   let rebuild;
   let rebuilt;
@@ -75484,6 +75525,10 @@ function parseInputs(getInput2, context4) {
   if (stageInput && !STAGE_ID_RE.test(stageInput)) {
     throw new ToolError(`Input "stage" must be a stage id (UUID), got "${stageInput}"`);
   }
+  const rekorInput = getInput2("rekor").trim().toLowerCase() || "true";
+  if (!["true", "false"].includes(rekorInput)) {
+    throw new ToolError(`Input "rekor" must be true or false, got "${rekorInput}"`);
+  }
   const manifest = readWorkspaceManifest(context4.workspace);
   const packageInput = getInput2("package").trim();
   const versionInput = getInput2("version").trim();
@@ -75513,13 +75558,7 @@ function parseInputs(getInput2, context4) {
   if (commitInput && !/^[0-9a-f]{40}$/.test(commitInput)) {
     throw new ToolError(`Input "commit" must be a full 40-character SHA, got "${commitInput}"`);
   }
-  const nodeInput = getInput2("node").trim();
-  const nodeMajor = nodeInput ? Number(nodeInput) : void 0;
-  if (nodeMajor !== void 0 && (!Number.isInteger(nodeMajor) || nodeMajor < 10 || nodeMajor > 40)) {
-    throw new ToolError(
-      `Input "node" must be a Node.js major version such as 22, got "${nodeInput}"`
-    );
-  }
+  const nodeMajor = parseNodeMajorOption(getInput2("node"), 'Input "node"');
   const memoryInput = parseMemoryLimit(getInput2("memory"), 'Input "memory"');
   const imageInput = getInput2("image");
   const failOnInput = getInput2("fail-on").trim() || "non-zero";
@@ -75539,6 +75578,7 @@ function parseInputs(getInput2, context4) {
   return {
     spec,
     stageId: stageInput || void 0,
+    rekor: rekorInput === "true",
     repository: repoInput || void 0,
     commit: commitInput || void 0,
     registry: getInput2("registry").trim() || void 0,
@@ -75572,6 +75612,11 @@ var HEADINGS = {
   "differs-from-source": "\u{1F6A8} DIFFERS FROM SOURCE",
   "could-not-verify": "\u26A0\uFE0F COULD NOT VERIFY"
 };
+var RULES_URL = "https://ujjwalv01.github.io/releaseproof/rules.html";
+var KEBAB_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+function ruleUrl(id) {
+  return KEBAB_ID.test(id) ? `${RULES_URL}#${id}` : RULES_URL;
+}
 function findingBullets(findings) {
   const groups = /* @__PURE__ */ new Map();
   for (const { id, severity } of sortFindings(findings)) {
@@ -75583,7 +75628,7 @@ function findingBullets(findings) {
     }
   }
   return [...groups].map(
-    ([id, { severity, count: count3 }]) => `- **${severity}** [\`${id}\`](https://github.com/ujjwalv01/releaseproof/blob/main/docs/rules.md)${count3 > 1 ? ` (${count3})` : ""}
+    ([id, { severity, count: count3 }]) => `- **${severity}** [\`${id}\`](${ruleUrl(id)})${count3 > 1 ? ` (${count3})` : ""}
 `
   );
 }
@@ -75706,6 +75751,7 @@ async function runAction(io2) {
     report = await io2.check({
       spec: inputs.spec,
       stageId: inputs.stageId,
+      rekor: inputs.rekor,
       registry: inputs.registry,
       repository: inputs.repository,
       commit: inputs.commit,
@@ -75749,6 +75795,8 @@ async function runAction(io2) {
   io2.setOutput("verdict", report.verdict.status);
   io2.setOutput("exit-code", String(report.verdict.exitCode));
   io2.setOutput("summary", report.verdict.summary);
+  io2.setOutput("findings", String(report.verdict.findings.length));
+  io2.setOutput("highest-severity", sortFindings(report.verdict.findings)[0]?.severity ?? "none");
   io2.setOutput("report-path", inputs.reportPath);
   io2.info(text);
   const markdown = renderMarkdown(report, text, {

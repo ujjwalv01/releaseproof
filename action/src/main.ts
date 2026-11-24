@@ -3,6 +3,7 @@ import {
   ExitCode,
   formatReport,
   type runCheck,
+  sortFindings,
   ToolError,
 } from "@releaseproof/core";
 import { type ActionContext, type ActionInputs, type GetInput, parseInputs } from "./inputs.js";
@@ -56,6 +57,7 @@ export async function runAction(io: ActionIo): Promise<void> {
     report = await io.check({
       spec: inputs.spec,
       stageId: inputs.stageId,
+      rekor: inputs.rekor,
       registry: inputs.registry,
       repository: inputs.repository,
       commit: inputs.commit,
@@ -101,6 +103,8 @@ export async function runAction(io: ActionIo): Promise<void> {
   io.setOutput("verdict", report.verdict.status);
   io.setOutput("exit-code", String(report.verdict.exitCode));
   io.setOutput("summary", report.verdict.summary);
+  io.setOutput("findings", String(report.verdict.findings.length));
+  io.setOutput("highest-severity", sortFindings(report.verdict.findings)[0]?.severity ?? "none");
   io.setOutput("report-path", inputs.reportPath);
   io.info(text);
 

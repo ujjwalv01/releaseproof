@@ -42,9 +42,31 @@ export const REQUIRED_WORKFLOWS = [
  */
 export const FOLLOW_UP_WORKFLOWS = ["pages.yml"];
 
+/**
+ * The issues a pull request closes: its closing keywords ("Closes #12") and the issues
+ * linked in the sidebar, as GitHub resolves them.
+ */
+const LINKED_ISSUES = `
+query ($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      closingIssuesReferences(first: 20) {
+        nodes {
+          number
+          state
+          repository { nameWithOwner }
+        }
+      }
+    }
+  }
+}`;
+
 /** Repository permissions that allow merging; only these people may arm or suggest. */
 const CAN_MERGE = new Set(["admin", "maintain", "write"]);
 const PASSING = new Set(["success", "skipped", "neutral"]);
+/** How often, and how far apart, to look again after GitHub refused a merge. */
+const MERGE_RECHECKS = 5;
+const MERGE_RECHECK_MS = 2_000;
 /** Above this many suggestions in one file, only "none" and "all" applied are recognised. */
 const MAX_PARTIAL_SUGGESTIONS = 10;
 /** The id git gives a file with these bytes; the same value the trees API reports. */
@@ -225,9 +247,14 @@ function githubApi(token) {
 
 /**
  * Handles one event. `api(method, path, body)` calls the GitHub REST API.
- * `eventName` is pull_request_target or workflow_run.
+ * `eventName` is pull_request_target or workflow_run. `wait(ms)` pauses; tests replace it.
  */
-export async function run({ eventName, event }, api, log = console.log) {
+export async function run(
+  { eventName, event },
+  api,
+  log = console.log,
+  wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+) {
   const repository = event.repository?.full_name ?? "";
   const defaultBranch = event.repository?.default_branch ?? "";
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository) || !defaultBranch) {
@@ -269,6 +296,39 @@ export async function run({ eventName, event }, api, log = console.log) {
       permissions.set(login, CAN_MERGE.has(permission));
     }
     return permissions.get(login);
+  }
+
+  /**
+   * Closes the open issues of this repository that the merged pull request says it closes.
+   * GitHub does this itself when a person merges; for a merge made with the workflow token
+   * it leaves them open. A failure here is only logged: the merge has already happened.
+   */
+  async function closeLinkedIssues(number) {
+    try {
+      const [owner, name] = repository.split("/");
+      const result = await api("POST", "/graphql", {
+        query: LINKED_ISSUES,
+        variables: { owner, name, number },
+      });
+      if (result?.errors?.length) {
+        throw new Error(result.errors.map((entry) => entry.message).join("; "));
+      }
+      const linked = result?.data?.repository?.pullRequest?.closingIssuesReferences?.nodes ?? [];
+      for (const issue of linked) {
+        const sameRepository =
+          issue?.repository?.nameWithOwner?.toLowerCase() === repository.toLowerCase();
+        if (!sameRepository || issue.state !== "OPEN" || !Number.isInteger(issue.number)) {
+          continue;
+        }
+        await api("PATCH", `${repo}/issues/${issue.number}`, {
+          state: "closed",
+          state_reason: "completed",
+        });
+        log(`#${number}: closed issue #${issue.number}`);
+      }
+    } catch (error) {
+      log(`#${number}: could not close its linked issues: ${error.message}`);
+    }
   }
 
   /** Takes the label off and says why. Silent when another run already removed it. */
@@ -508,8 +568,14 @@ export async function run({ eventName, event }, api, log = console.log) {
       if (![405, 409, 422].includes(error.status)) {
         throw error;
       }
-      if ((await api("GET", `${repo}/pulls/${number}`)).merged) {
-        return log(`#${number}: already merged`);
+      // Another run of this workflow may be merging the same head right now (several
+      // events can arrive within a second). GitHub then refuses this call, and reports the
+      // pull request as merged only a moment later, so look a few times before giving up.
+      for (let attempt = 0; attempt < MERGE_RECHECKS; attempt++) {
+        if ((await api("GET", `${repo}/pulls/${number}`)).merged) {
+          return log(`#${number}: already merged`);
+        }
+        await wait(MERGE_RECHECK_MS);
       }
       return disarm(
         number,
@@ -517,6 +583,7 @@ export async function run({ eventName, event }, api, log = console.log) {
       );
     }
     log(`#${number}: merged ${head}`);
+    await closeLinkedIssues(number);
     for (const workflow of FOLLOW_UP_WORKFLOWS) {
       try {
         await api("POST", `${repo}/actions/workflows/${workflow}/dispatches`, {

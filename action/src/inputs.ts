@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   parseMemoryLimit,
+  parseNodeMajorOption,
   parseSpec,
   STAGE_ID_RE,
   ToolError,
@@ -14,6 +15,7 @@ export interface ActionInputs {
   /** Undefined when a stage id is given without a usable package spec. */
   spec: string | undefined;
   stageId: string | undefined;
+  rekor: boolean;
   repository: string | undefined;
   commit: string | undefined;
   registry: string | undefined;
@@ -81,6 +83,10 @@ export function parseInputs(getInput: GetInput, context: ActionContext): ActionI
   if (stageInput && !STAGE_ID_RE.test(stageInput)) {
     throw new ToolError(`Input "stage" must be a stage id (UUID), got "${stageInput}"`);
   }
+  const rekorInput = getInput("rekor").trim().toLowerCase() || "true";
+  if (!["true", "false"].includes(rekorInput)) {
+    throw new ToolError(`Input "rekor" must be true or false, got "${rekorInput}"`);
+  }
   const manifest = readWorkspaceManifest(context.workspace);
   const packageInput = getInput("package").trim();
   const versionInput = getInput("version").trim();
@@ -119,16 +125,7 @@ export function parseInputs(getInput: GetInput, context: ActionContext): ActionI
   if (commitInput && !/^[0-9a-f]{40}$/.test(commitInput)) {
     throw new ToolError(`Input "commit" must be a full 40-character SHA, got "${commitInput}"`);
   }
-  const nodeInput = getInput("node").trim();
-  const nodeMajor = nodeInput ? Number(nodeInput) : undefined;
-  if (
-    nodeMajor !== undefined &&
-    (!Number.isInteger(nodeMajor) || nodeMajor < 10 || nodeMajor > 40)
-  ) {
-    throw new ToolError(
-      `Input "node" must be a Node.js major version such as 22, got "${nodeInput}"`,
-    );
-  }
+  const nodeMajor = parseNodeMajorOption(getInput("node"), 'Input "node"');
   const memoryInput = parseMemoryLimit(getInput("memory"), 'Input "memory"');
   const imageInput = getInput("image");
   const failOnInput = (getInput("fail-on").trim() || "non-zero") as FailOn;
@@ -149,6 +146,7 @@ export function parseInputs(getInput: GetInput, context: ActionContext): ActionI
   return {
     spec,
     stageId: stageInput || undefined,
+    rekor: rekorInput === "true",
     repository: repoInput || undefined,
     commit: commitInput || undefined,
     registry: getInput("registry").trim() || undefined,

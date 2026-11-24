@@ -1,6 +1,13 @@
 import { type CheckReport, countBySeverity, type Finding } from "@releaseproof/core";
 import { describe, expect, it } from "vitest";
-import { fenceFor, ISSUE_BODY_LIMIT, issueTitle, renderMarkdown, SUMMARY_LIMIT } from "./report.js";
+import {
+  fenceFor,
+  ISSUE_BODY_LIMIT,
+  issueTitle,
+  RULES_URL,
+  renderMarkdown,
+  SUMMARY_LIMIT,
+} from "./report.js";
 
 function report(status: CheckReport["verdict"]["status"], exitCode: 0 | 1 | 2): CheckReport {
   return {
@@ -54,8 +61,6 @@ function finding(id: string, severity: Finding["severity"]): Finding {
   return { id, severity, title: "title", detail: "detail" };
 }
 
-const RULES_URL = "https://github.com/ujjwalv01/releaseproof/blob/main/docs/rules.md";
-
 /** The markdown with every fenced block removed: what GitHub renders as markdown. */
 function outsideFences(md: string): string {
   const kept: string[] = [];
@@ -100,7 +105,7 @@ describe("renderMarkdown", () => {
     );
     expect(
       md.startsWith(
-        `## 🚨 DIFFERS FROM SOURCE — \`x@1.0.0\`\n\n\`\`\`text\ndiffers-from-source summary\n\`\`\`\n\nFindings: 1 high\n\n- **high** [\`file-added\`](${RULES_URL})\n\n\`\`\`text\nreport text\n<img src=x onerror=alert(1)>\n\n\`\`\`\n`,
+        `## 🚨 DIFFERS FROM SOURCE — \`x@1.0.0\`\n\n\`\`\`text\ndiffers-from-source summary\n\`\`\`\n\nFindings: 1 high\n\n- **high** [\`file-added\`](${RULES_URL}#file-added)\n\n\`\`\`text\nreport text\n<img src=x onerror=alert(1)>\n\n\`\`\`\n`,
       ),
     ).toBe(true);
     expect(md).toContain("Workflow run: https://github.com/o/r/actions/runs/1");
@@ -133,14 +138,30 @@ describe("renderMarkdown", () => {
     const original = structuredClone(value.verdict.findings);
     const md = renderMarkdown(value, "report");
     expect(md.match(/^- .*$/gm)).toEqual([
-      `- **critical** [\`install-script-added\`](${RULES_URL})`,
-      `- **high** [\`file-added\`](${RULES_URL})`,
-      `- **high** [\`file-changed\`](${RULES_URL})`,
-      `- **medium** [\`file-missing\`](${RULES_URL})`,
-      `- **low** [\`version-not-in-source\`](${RULES_URL})`,
-      `- **info** [\`rebuild-note\`](${RULES_URL})`,
+      `- **critical** [\`install-script-added\`](${RULES_URL}#install-script-added)`,
+      `- **high** [\`file-added\`](${RULES_URL}#file-added)`,
+      `- **high** [\`file-changed\`](${RULES_URL}#file-changed)`,
+      `- **medium** [\`file-missing\`](${RULES_URL}#file-missing)`,
+      `- **low** [\`version-not-in-source\`](${RULES_URL}#version-not-in-source)`,
+      `- **info** [\`rebuild-note\`](${RULES_URL}#rebuild-note)`,
     ]);
     expect(value.verdict.findings).toEqual(original);
+  });
+
+  it("links a non-kebab-case finding id to the rules page without an anchor", () => {
+    const md = renderMarkdown(
+      withFindings([
+        finding("dependency-added", "high"),
+        finding("Not_Kebab", "medium"),
+        finding("bad#id) [x](https://evil.example", "low"),
+      ]),
+      "report",
+    );
+    expect(md.match(/^- .*$/gm)).toEqual([
+      `- **high** [\`dependency-added\`](${RULES_URL}#dependency-added)`,
+      `- **medium** [\`Not_Kebab\`](${RULES_URL})`,
+      `- **low** [\`bad#id) [x](https://evil.example\`](${RULES_URL})`,
+    ]);
   });
 
   it("counts duplicate ids once and shows their most severe occurrence", () => {
@@ -155,8 +176,8 @@ describe("renderMarkdown", () => {
       "report",
     );
     expect(md.match(/^- .*$/gm)).toEqual([
-      `- **high** [\`file-added\`](${RULES_URL}) (2)`,
-      `- **high** [\`unexpected-path\`](${RULES_URL}) (3)`,
+      `- **high** [\`file-added\`](${RULES_URL}#file-added) (2)`,
+      `- **high** [\`unexpected-path\`](${RULES_URL}#unexpected-path) (3)`,
     ]);
     expect(md).toContain("Findings: 3 high, 2 medium");
   });
@@ -174,7 +195,7 @@ describe("renderMarkdown", () => {
     ]);
     const md = renderMarkdown(value, untrusted);
     const prefix = md.split("````text\n")[0];
-    expect(prefix).toContain(`- **high** [\`file-added\`](${RULES_URL})`);
+    expect(prefix).toContain(`- **high** [\`file-added\`](${RULES_URL}#file-added)`);
     expect(prefix).not.toContain(untrusted);
     expect(prefix).not.toContain("@someone");
     expect(md).toContain(`\`\`\`\`text\n${untrusted}\n\`\`\`\``);
@@ -236,7 +257,7 @@ describe("renderMarkdown", () => {
     const md = renderMarkdown(report("differs-from-source", 1), "x".repeat(2_000), {
       maxChars: 500,
     });
-    expect(md).toContain(`- **high** [\`file-added\`](${RULES_URL})`);
+    expect(md).toContain(`- **high** [\`file-added\`](${RULES_URL}#file-added)`);
     expect(md).toContain("… truncated; the JSON report has everything");
     expect(md.length).toBeLessThanOrEqual(500);
   });
@@ -255,7 +276,7 @@ describe("renderMarkdown", () => {
       { maxChars: 700 },
     );
     expect(md).toContain("… finding list truncated; the JSON report has everything");
-    expect(md.match(/^- .*$/gm)?.every((line) => line.endsWith(`](${RULES_URL})`))).toBe(true);
+    expect(md.match(/^- .*$/gm)?.every((line) => /#[a-z0-9-]+\)$/.test(line))).toBe(true);
     expect(md.length).toBeLessThanOrEqual(700);
     expect(md.trimEnd().endsWith('"safe".')).toBe(true);
   });

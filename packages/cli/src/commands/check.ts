@@ -6,6 +6,7 @@ import {
   ExitCode,
   formatReport,
   parseMemoryLimit,
+  parseNodeMajorOption,
   runCheck,
   ToolError,
   validateImageReference,
@@ -38,17 +39,6 @@ export interface CommandIo {
 
 export interface CheckCommandDeps {
   runCheck: (options: CheckOptions) => Promise<CheckReport>;
-}
-
-function parseNodeMajor(value: string | undefined): number | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const major = Number(value);
-  if (!Number.isInteger(major) || major < 10 || major > 40) {
-    throw new ToolError(`--node expects a Node.js major version such as 22, got "${value}"`);
-  }
-  return major;
 }
 
 function parsePatchLines(value: string | undefined): number | undefined {
@@ -141,7 +131,7 @@ export async function runCheckCommand(
       repository: options.repo,
       commit: options.commit,
       image: options.image === undefined ? undefined : validateImageReference(options.image),
-      nodeMajor: parseNodeMajor(options.node),
+      nodeMajor: parseNodeMajorOption(options.node),
       buildCommand: options.buildCommand,
       memory: parseMemoryLimit(options.memory),
       offline: options.offline,
