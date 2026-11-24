@@ -15,6 +15,10 @@ inputs:
   stage:
     description: Stage id of a staged, not yet approved version to check instead of a published one. Needs a registry token in NPM_TOKEN or NODE_AUTH_TOKEN.
     required: false
+  rekor:
+    description: Look up a staged version's provenance in the Rekor transparency log (sends the tarball SHA-512 to Rekor). Only has effect with stage.
+    required: false
+    default: "true"
   repo:
     description: Repository the release must have been built from. Any other repository is a critical finding.
     required: false
@@ -37,7 +41,7 @@ inputs:
     description: Shell command to build with instead of the detected build script.
     required: false
   memory:
-    description: Docker memory limit for the build containers, such as 4g (the default) or 6g.
+    description: Docker memory limit with a k, m, or g unit (at least 6m) for the build containers, such as 4g (the default) or 6g.
     required: false
   fail-on:
     description: When to fail the job. "non-zero" (differs or could not verify), "differs" (only when it differs), or "never".
@@ -67,6 +71,10 @@ outputs:
     description: 0 matches, 1 differs, 2 could not verify
   summary:
     description: One-line verdict
+  findings:
+    description: Total number of findings (0 when there are none)
+  highest-severity:
+    description: Highest finding severity (critical, high, medium, low, info, or none)
   report-path:
     description: Path of the JSON report
   issue-url:

@@ -10,8 +10,8 @@ write `uses: ujjwalv01/releaseproof@<sha>`.
 `releaseproof/action` runs `releaseproof check` for one package version inside a workflow
 and reports the verdict three ways: the job summary (always), the job status (configurable
 with `fail-on`), and optionally an issue. The full JSON report is written to a file the
-workflow can upload as an artifact. Outputs: `verdict`, `exit-code`, `summary`,
-`report-path`, `issue-url`.
+workflow can upload as an artifact. Outputs: `verdict`, `exit-code`, `summary`, `findings`,
+`highest-severity`, `report-path`, `issue-url`.
 
 Defaults are chosen so that the common case needs no inputs at all when the action runs in
 the package's own repository after a release:
@@ -30,6 +30,9 @@ the package's own repository after a release:
 
 The action runs untrusted builds (inside Docker, as the CLI does) on a runner that holds a
 `GITHUB_TOKEN`. The job must never become the attack vector this tool detects.
+
+Rekor lookups for staged versions send the release tarball's SHA-512 to `rekor.sigstore.dev`
+by default; set `rekor: "false"` to opt out, matching the CLI's `--no-rekor`.
 
 | Risk | Decision |
 | --- | --- |
@@ -61,9 +64,14 @@ jobs:
       - uses: actions/checkout@<sha>
         with:
           persist-credentials: false
-      - uses: ujjwalv01/releaseproof@<sha>
+      - id: check
+        uses: ujjwalv01/releaseproof@<sha>
         with:
           create-issue: "false"
+      - if: always() && steps.check.outputs.highest-severity == 'critical'
+        run: echo "Critical finding ($FINDINGS total)"
+        env:
+          FINDINGS: ${{ steps.check.outputs.findings }}
       - uses: actions/upload-artifact@<sha>
         if: always()
         with:

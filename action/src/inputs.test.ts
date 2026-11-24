@@ -106,9 +106,18 @@ describe("parseInputs", () => {
     const bad: Array<[Record<string, string>, RegExp]> = [
       [{ repo: "https://gitlab.com/o/r" }, /must look like https:\/\/github.com/],
       [{ commit: "abc" }, /full 40-character SHA/],
-      [{ node: "twenty" }, /Node.js major/],
+      [{ node: "twenty" }, /Input "node" must be a Node\.js major/],
+      [{ node: "0x16" }, /Input "node" must be a Node\.js major/],
+      [{ node: "0b10110" }, /Input "node" must be a Node\.js major/],
+      [{ node: "1e1" }, /Input "node" must be a Node\.js major/],
+      [{ node: "22.0" }, /Input "node" must be a Node\.js major/],
+      [{ node: "+22" }, /Input "node" must be a Node\.js major/],
+      [{ node: "-22" }, /Input "node" must be a Node\.js major/],
+      [{ node: "9" }, /Input "node" must be a Node\.js major/],
+      [{ node: "41" }, /Input "node" must be a Node\.js major/],
       [{ "fail-on": "sometimes" }, /non-zero, differs or never/],
       [{ "create-issue": "yes" }, /true or false/],
+      [{ rekor: "sometimes" }, /Input "rekor" must be true or false/],
       [{ "report-path": "../escape.json" }, /relative path inside the workspace/],
       [{ "report-path": "/tmp/x.json" }, /relative path inside the workspace/],
     ];
@@ -142,6 +151,17 @@ describe("parseInputs with a stage id", () => {
     expect(noSpec.spec).toBeUndefined();
   });
 
+  it.each([
+    ["false", false],
+    ["FALSE", false],
+    ["true", true],
+    ["TRUE", true],
+    ["", true],
+  ])("parses rekor input %j to %j", (rekor, expected) => {
+    const parsed = parseInputs(inputs({ rekor }), context());
+    expect(parsed.rekor).toBe(expected);
+  });
+
   it("does not use a private root as a stage cross-check", () => {
     const workspace = workspaceWith({ name: "root", version: "1.0.0", private: true });
     const stage = "123e4567-e89b-12d3-a456-426614174000";
@@ -172,7 +192,8 @@ describe("parseInputs memory", () => {
   it.each([
     ["4g", "4g"],
     ["6144m", "6144m"],
-    ["512", "512"],
+    ["6m", "6m"],
+    [" 4G ", "4g"],
     [" 6G ", "6g"],
     ["", undefined],
     ["   ", undefined],
@@ -180,12 +201,22 @@ describe("parseInputs memory", () => {
     expect(parseInputs(inputs({ memory }), context()).memory).toBe(expected);
   });
 
-  it.each(["4gb", "four", "-1g", "4g --privileged", "4g; echo unsafe", "4g\0", "4\n2g"])(
-    "rejects %j with the existing input message",
-    (memory) => {
-      expect(() => parseInputs(inputs({ memory }), context())).toThrow(
-        new ToolError(`Input "memory" must be a Docker size such as 4g or 6144m, got "${memory}"`),
-      );
-    },
-  );
+  it.each([
+    "0",
+    "0g",
+    "5m",
+    "4096",
+    "1k",
+    "4gb",
+    "four",
+    "-1g",
+    "4g --privileged",
+    "4g; echo unsafe",
+    "4g\0",
+    "4\n2g",
+  ])("rejects %j with the existing input message", (memory) => {
+    expect(() => parseInputs(inputs({ memory }), context())).toThrow(
+      new ToolError(`Input "memory" must be a Docker size such as 4g or 6144m, got "${memory}"`),
+    );
+  });
 });

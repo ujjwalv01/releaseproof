@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ToolError } from "../errors.js";
 import type { PackageInfo, RepoInspection } from "./inspect.js";
-import { OUT_DIR, parseNodeMajor, planBuild, REPO_DIR } from "./plan.js";
+import { OUT_DIR, parseNodeMajor, parseNodeMajorOption, planBuild, REPO_DIR } from "./plan.js";
 
 const commit = "7d2900eca1c22b3f87c13987c8d4b7c9a29b733a";
 
@@ -83,6 +83,37 @@ describe("planBuild: image override", () => {
       ),
     );
   });
+});
+
+describe("parseNodeMajorOption", () => {
+  it.each([
+    [undefined, undefined],
+    ["22", 22],
+    ["24", 24],
+    ["10", 10],
+    ["40", 40],
+    [" 22 ", 22],
+  ])("parses %j to %j", (input, expected) => {
+    expect(parseNodeMajorOption(input)).toBe(expected);
+  });
+
+  it.each(["0x16", "0b10110", "1e1", "2e1", "22.0", "+22", "-22", "9", "41", "", "   ", "twenty"])(
+    'rejects %j for --node and Input "node"',
+    (input) => {
+      expect(() => parseNodeMajorOption(input)).toThrow(
+        new ToolError(
+          `--node must be a Node.js major version such as 22, got ${JSON.stringify(input)}`,
+        ),
+      );
+      if (input.trim() !== "") {
+        expect(() => parseNodeMajorOption(input, 'Input "node"')).toThrow(
+          new ToolError(
+            `Input "node" must be a Node.js major version such as 22, got ${JSON.stringify(input)}`,
+          ),
+        );
+      }
+    },
+  );
 });
 
 describe("planBuild: package selection", () => {

@@ -170,6 +170,47 @@ describe("runCheck", () => {
     expect(report.verdict.findings[0]?.id).toBe("provenance-repository-unexpected");
   });
 
+  it("logs when provenance certifies a source and a different --commit is not used, without echoing non-hex commits", async () => {
+    const diffLog = vi.fn();
+    const diffReport = await runCheck(
+      {
+        spec: "@releaseproof/fixture@1.0.0",
+        commit: "5d6e7f8".padEnd(40, "0"),
+        log: diffLog,
+      },
+      depsFor({ release: "clean" }),
+    );
+    expect(diffReport.source?.commit).toBe("a".repeat(40));
+    expect(diffLog).toHaveBeenCalledWith(
+      "provenance certifies aaaaaaa; --commit 5d6e7f8 is not used",
+    );
+
+    const sameLog = vi.fn();
+    await runCheck(
+      {
+        spec: "@releaseproof/fixture@1.0.0",
+        commit: "A".repeat(40),
+        log: sameLog,
+      },
+      depsFor({ release: "clean" }),
+    );
+    expect(sameLog.mock.calls.map((c) => c[0])).not.toEqual(
+      expect.arrayContaining([expect.stringContaining("--commit")]),
+    );
+
+    const badLog = vi.fn();
+    await runCheck(
+      {
+        spec: "@releaseproof/fixture@1.0.0",
+        commit: "not-a-hex-sha-secret-value",
+        log: badLog,
+      },
+      depsFor({ release: "clean" }),
+    );
+    expect(badLog).toHaveBeenCalledWith("provenance certifies aaaaaaa; --commit is not used");
+    expect(badLog.mock.calls.map((c) => c[0]).join("\n")).not.toContain("not-a-hex-sha");
+  });
+
   it("rejects a malformed --repo before fetching anything", async () => {
     const deps = depsFor({ release: "clean" });
     let fetched = false;

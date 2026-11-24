@@ -22,6 +22,25 @@ export function validateImageReference(image: string, inputName = "--image"): st
   return image;
 }
 
+/** Shared CLI/Action validation for `--node` / `node`: plain decimal digits in [10, 40]. */
+export function parseNodeMajorOption(
+  value: string | undefined,
+  inputName = "--node",
+): number | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  if (inputName !== "--node" && trimmed === "") return undefined;
+  if (/^\d{1,2}$/.test(trimmed)) {
+    const major = Number(trimmed);
+    if (major >= 10 && major <= 40) {
+      return major;
+    }
+  }
+  throw new ToolError(
+    `${inputName} must be a Node.js major version such as 22, got ${JSON.stringify(value)}`,
+  );
+}
+
 export type PackageManagerName = "npm" | "pnpm" | "yarn-berry" | "yarn-classic";
 
 /** Scripts npm runs during `npm pack`; their presence means the install stage is needed. */

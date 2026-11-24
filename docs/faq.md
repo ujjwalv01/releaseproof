@@ -52,7 +52,9 @@ Other checks can print these alternatives or continuation lines:
 - **Rebuild:** `not run` means no rebuild result is available (`not run (no source)` when
   there was no source); `FAILED` gives the duration when known and the failure reason.
   A failure can include the image digest and `last output of the … stage:`, followed by
-  up to 20 nonblank lines from the last failed or timed-out stage.
+  up to 20 nonblank lines from the last failed or timed-out stage. See
+  [docs/troubleshooting.md](troubleshooting.md) for what each failure reason means and what
+  to try next.
 - **Named source:** after an `OK` rebuild, `from … as given by --repo/--commit` means you
   chose the reference repository/commit and provenance did not certify that choice.
   The verdict's reason also marks a matching source as named by you.
@@ -144,7 +146,8 @@ deterministic verdict is missing, the result is `COULD NOT VERIFY` rather than a
 The exit codes reflect this: `0` matches source, `1` differs from source, `2` could not
 verify or tool error. Findings that need attention are listed even when the verdict is
 `COULD NOT VERIFY`. Treating it as "safe" would undo the purpose of the tool. For the full
-rule set and severity levels, see [docs/rules.md](rules.md).
+rule set and severity levels, see [docs/rules.md](rules.md); for rebuild failure reasons and
+what flags to try, see [docs/troubleshooting.md](troubleshooting.md).
 
 ---
 

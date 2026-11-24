@@ -6,12 +6,15 @@ import {
   build,
   CONTENT_SECURITY_POLICY,
   checkLinks,
+  escapeHtml,
   PAGES,
+  pageUrl,
   REPOSITORY,
   ROOT,
   renderMarkdown,
   renderPage,
   rewriteHref,
+  SITE_URL,
   slugify,
 } from "./build.mjs";
 
@@ -162,13 +165,71 @@ describe("build", () => {
       expect(html).not.toMatch(/<script/i);
       expect(html).toContain(CONTENT_SECURITY_POLICY);
       expect(html).not.toMatch(/\s(?:src|srcset)="(?:https?:)?\/\//);
-      expect(html).not.toMatch(/<link[^>]+href="(?:https?:)?\/\//);
+      expect(html).not.toMatch(/<link(?![^>]*\brel="canonical")[^>]+href="(?:https?:)?\/\//);
+    }
+  });
+
+  it("writes sitemap.xml and robots.txt for the public site URL", () => {
+    const sitemap = page("sitemap.xml");
+    expect(sitemap).toMatch(/^<\?xml version="1\.0" encoding="UTF-8"\?>\n<urlset xmlns="/);
+    expect(sitemap.trimEnd().endsWith("</urlset>")).toBe(true);
+    const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+    expect(locs).toEqual(PAGES.map((p) => pageUrl(p)));
+    expect(locs[0]).toBe(SITE_URL);
+    expect(locs).not.toContain(`${SITE_URL}index.html`);
+
+    const robots = page("robots.txt");
+    expect(robots).toContain("User-agent: *\nAllow: /");
+    expect(robots).toContain(`Sitemap: ${SITE_URL}sitemap.xml`);
+  });
+
+  it("includes canonical link and Open Graph metadata on every page", () => {
+    for (const entry of PAGES) {
+      const html = page(entry.output);
+      const isHome = entry.output === "index.html";
+      const expectedTitle = isHome ? "releaseproof · Home" : `${entry.label} · releaseproof`;
+      const expectedDescription = isHome
+        ? "releaseproof verifies that an npm release matches its source: it rebuilds the package from the certified commit and compares the two, file by file."
+        : `releaseproof documentation: ${entry.label}`;
+      const expectedUrl = pageUrl(entry);
+
+      expect(html.match(/<link rel="canonical" href="[^"]+">/g)).toEqual([
+        `<link rel="canonical" href="${escapeHtml(expectedUrl)}">`,
+      ]);
+      expect(html).toContain(`<meta property="og:title" content="${escapeHtml(expectedTitle)}">`);
+      expect(html).toContain(
+        `<meta property="og:description" content="${escapeHtml(expectedDescription)}">`,
+      );
+      expect(html).toContain(`<meta property="og:url" content="${escapeHtml(expectedUrl)}">`);
+      expect(html).toContain('<meta property="og:type" content="website">');
+      expect(html).toContain('<meta property="og:site_name" content="releaseproof">');
     }
   });
 
   it("gives every rule its own anchor on the rules page", () => {
     const rules = page("rules.html");
-    for (const id of ["dependency-added", "unexpected-path", "file-changed"]) {
+    const doc = readFileSync(path.join(ROOT, "docs/rules.md"), "utf8");
+    const ids = [];
+    let inRuleTable = false;
+    for (const line of doc.split("\n")) {
+      if (!line.startsWith("|")) {
+        inRuleTable = false;
+        continue;
+      }
+      const first = line.split("|")[1]?.trim() ?? "";
+      if (first === "Id") {
+        inRuleTable = true;
+        continue;
+      }
+      if (!inRuleTable || /^-+$/.test(first)) {
+        continue;
+      }
+      for (const match of first.matchAll(/`([^`]+)`/g)) {
+        ids.push(match[1]);
+      }
+    }
+    expect(ids.length).toBeGreaterThan(30);
+    for (const id of ids) {
       expect(rules).toContain(`<code id="${id}">`);
     }
   });

@@ -21,6 +21,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { Marked } from "marked";
 
 export const REPOSITORY = "https://github.com/ujjwalv01/releaseproof";
+export const SITE_URL = "https://ujjwalv01.github.io/releaseproof/";
 export const SPONSOR_URL = "https://github.com/sponsors/ujjwalv01";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(HERE, "..");
@@ -32,6 +33,7 @@ export const ROOT = path.resolve(HERE, "..");
 export const PAGES = [
   { source: "README.md", output: "index.html", label: "Home" },
   { source: "docs/faq.md", output: "faq.html", label: "FAQ" },
+  { source: "docs/troubleshooting.md", output: "troubleshooting.html", label: "Troubleshooting" },
   { source: "docs/rules.md", output: "rules.html", label: "Rules" },
   { source: "docs/json-report.md", output: "json-report.html", label: "JSON report" },
   {
@@ -262,6 +264,22 @@ function renderTocLinks(headings) {
     .join("\n");
 }
 
+/** Public absolute URL for a page output, using the root URL for index.html. */
+export function pageUrl(page) {
+  return page.output === "index.html" ? SITE_URL : `${SITE_URL}${page.output}`;
+}
+
+export function renderSitemap(pages = PAGES) {
+  const urls = pages
+    .map((page) => `  <url>\n    <loc>${escapeHtml(pageUrl(page))}</loc>\n  </url>`)
+    .join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+}
+
+export function renderRobotsTxt() {
+  return `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}sitemap.xml\n`;
+}
+
 /** One page of the site: header, menu, the rendered Markdown and a sidebar of boxes. */
 export function renderPage({ page, body, site, headings = [] }) {
   const isHome = page.output === "index.html";
@@ -269,6 +287,7 @@ export function renderPage({ page, body, site, headings = [] }) {
   const description = isHome
     ? "releaseproof verifies that an npm release matches its source: it rebuilds the package from the certified commit and compares the two, file by file."
     : `releaseproof documentation: ${page.label}`;
+  const canonicalUrl = pageUrl(page);
   const menu = site.pages
     .map((item) => {
       const current = item === page ? ' aria-current="page"' : "";
@@ -293,7 +312,13 @@ export function renderPage({ page, body, site, headings = [] }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">
 <meta name="description" content="${escapeHtml(description)}">
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="${escapeHtml(description)}">
+<meta property="og:url" content="${escapeHtml(canonicalUrl)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="releaseproof">
 <title>${escapeHtml(title)}</title>
+<link rel="canonical" href="${escapeHtml(canonicalUrl)}">
 <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -364,6 +389,8 @@ export function checkLinks(pages, exists) {
   for (const [file, html] of pages) {
     for (const [, attribute, value] of html.matchAll(/\s(href|src|srcset)="([^"]*)"/g)) {
       const url = value.replaceAll("&amp;", "&");
+      // Absolute URLs — including each page's own <link rel="canonical" href="..."> — are skipped
+      // here; internal navigation uses relative hrefs and canonical URLs are verified against PAGES.
       if (ABSOLUTE_URL.test(url)) {
         continue;
       }
@@ -426,6 +453,8 @@ export function build({
   for (const [file, contents] of html) {
     writeFileSync(path.join(outDir, file), contents);
   }
+  writeFileSync(path.join(outDir, "sitemap.xml"), renderSitemap(PAGES));
+  writeFileSync(path.join(outDir, "robots.txt"), renderRobotsTxt());
   for (const asset of assets) {
     copyFileSync(path.join(HERE, asset), path.join(outDir, asset));
   }

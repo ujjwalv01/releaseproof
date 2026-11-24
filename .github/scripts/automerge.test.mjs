@@ -288,6 +288,10 @@ describe("run", () => {
       checkRuns: [],
       status: { total_count: 0, state: "pending" },
       mergeError: undefined,
+      linkedIssues: [],
+      linkedError: undefined,
+      graphqlVariables: [],
+      closedIssues: [],
       posted: [],
       merges: [],
       dispatched: [],
@@ -323,6 +327,20 @@ describe("run", () => {
         state.pr = { ...state.pr, merged: true, state: "closed" };
         return { merged: true };
       }
+      if (route === "POST /graphql") {
+        if (state.linkedError) throw fail(state.linkedError);
+        state.graphqlVariables.push(body.variables);
+        return {
+          data: {
+            repository: { pullRequest: { closingIssuesReferences: { nodes: state.linkedIssues } } },
+          },
+        };
+      }
+      const closed = /^PATCH \/issues\/(\d+)$/.exec(route)?.[1];
+      if (closed) {
+        state.closedIssues.push([Number(closed), body]);
+        return {};
+      }
       const permission = /^GET \/collaborators\/([^/]+)\/permission$/.exec(route)?.[1];
       if (permission) {
         if (!state.permissions[permission]) throw fail(404);
@@ -353,7 +371,16 @@ describe("run", () => {
     });
     state.labeled = (sender = "owner", name = LABEL) =>
       state.event("labeled", { label: { name }, sender: { login: sender } });
-    state.go = (input = state.event()) => run(input, state.api, (line) => state.log.push(line));
+    state.waits = [];
+    state.go = (input = state.event()) =>
+      run(
+        input,
+        state.api,
+        (line) => state.log.push(line),
+        async (ms) => {
+          state.waits.push(ms);
+        },
+      );
     return state;
   }
 
@@ -487,6 +514,45 @@ describe("run", () => {
       expectWaiting(state);
       expect(state.posted).toEqual([]);
       expect(state.log.join("\n")).toContain("not every suggestion is committed yet");
+    });
+
+    it("closes the open issues of this repository that the merged pull request closes", async () => {
+      const state = world();
+      const linked = (number, issueState, repository = "o/r") => ({
+        number,
+        state: issueState,
+        repository: { nameWithOwner: repository },
+      });
+      state.linkedIssues = [
+        linked(25, "OPEN"),
+        linked(26, "CLOSED"),
+        linked(27, "OPEN", "someone/else"),
+        linked(28, "OPEN", "O/R"),
+      ];
+      await state.go();
+      expect(state.merges).toHaveLength(1);
+      expect(state.graphqlVariables).toEqual([{ owner: "o", name: "r", number: 7 }]);
+      const completed = { state: "closed", state_reason: "completed" };
+      expect(state.closedIssues).toEqual([
+        [25, completed],
+        [28, completed],
+      ]);
+    });
+
+    it("closes no issue when nothing was merged, and only logs when closing fails", async () => {
+      const waiting = world();
+      waiting.linkedIssues = [{ number: 25, state: "OPEN", repository: { nameWithOwner: "o/r" } }];
+      waiting.runs.pop();
+      await waiting.go();
+      expect(waiting.merges).toEqual([]);
+      expect(waiting.closedIssues).toEqual([]);
+
+      const failing = world();
+      failing.linkedError = 502;
+      await failing.go();
+      expect(failing.merges).toHaveLength(1);
+      expect(failing.dispatched).toHaveLength(FOLLOW_UP_WORKFLOWS.length);
+      expect(failing.log.join("\n")).toContain("#7: could not close its linked issues");
     });
 
     it("re-checks every labelled pull request when a CI run finishes", async () => {
@@ -695,19 +761,24 @@ describe("run", () => {
     expect(state.merges).toHaveLength(1);
   });
 
-  it("takes the label off when GitHub refuses the merge, unless it is merged already", async () => {
+  it("takes the label off when GitHub refuses the merge and the pull request stays unmerged", async () => {
     const refused = world();
     refused.mergeError = 405;
     await refused.go();
     expectLabelOff(refused, "GitHub refused the merge (HTTP 405)");
+    expect(refused.waits).toEqual([2000, 2000, 2000, 2000, 2000]);
+  });
 
+  it("says nothing when another run merged the same head a moment later", async () => {
+    // Read 1 is the evaluation. The merge is refused; reads 2 and 3 still say "not merged",
+    // and read 4 shows the merge the other run made.
     const raced = world();
     raced.mergeError = 405;
     const api = raced.api;
     let reads = 0;
     raced.api = async (method, path, body) => {
       const result = await api(method, path, body);
-      if (method === "GET" && path === "/repos/o/r/pulls/7" && ++reads > 1) {
+      if (method === "GET" && path === "/repos/o/r/pulls/7" && ++reads > 3) {
         return { ...result, merged: true };
       }
       return result;
@@ -715,6 +786,8 @@ describe("run", () => {
     await raced.go();
     expect(raced.removedLabel).toBe(false);
     expect(raced.posted).toEqual([]);
+    expect(raced.waits).toEqual([2000, 2000]);
+    expect(raced.log.join("\n")).toContain("#7: already merged");
   });
 });
 
@@ -757,6 +830,7 @@ describe("automerge.yml", () => {
     expect(code).toContain("persist-credentials: false");
     expect(code).not.toMatch(/pull_request\.head|head_ref|head\.sha|head\.ref|refs\/pull/);
     expect(code.match(/\$\{\{[^}]*\}\}/g)).toEqual([
+      expression("github.event.pull_request.number || 'ci'"),
       expression("github.event.repository.default_branch"),
       expression("github.token"),
     ]);

@@ -149,6 +149,8 @@ function diffReport(diff: DiffResult): DiffReport {
   };
 }
 
+const HEX_COMMIT_RE = /^[0-9a-f]{40}$/i;
+
 /**
  * Decides where to rebuild from: certified provenance first, else the commit the user named
  * together with its repository. `repository` on its own is only an expectation.
@@ -156,9 +158,20 @@ function diffReport(diff: DiffResult): DiffReport {
 export function chooseSource(
   provenance: ProvenanceResult,
   options: CheckOptions,
+  log?: ((line: string) => void) | undefined,
 ): SourceRef | undefined {
   const certified = sourceFromProvenance(provenance);
   if (certified) {
+    const rawCommit = options.commit?.trim();
+    if (rawCommit) {
+      if (!HEX_COMMIT_RE.test(rawCommit)) {
+        log?.(`provenance certifies ${certified.commit.slice(0, 7)}; --commit is not used`);
+      } else if (rawCommit.toLowerCase() !== certified.commit.toLowerCase()) {
+        log?.(
+          `provenance certifies ${certified.commit.slice(0, 7)}; --commit ${rawCommit.toLowerCase().slice(0, 7)} is not used`,
+        );
+      }
+    }
     return certified;
   }
   if (options.commit) {
@@ -291,7 +304,7 @@ export async function runCheck(
     `provenance: ${provenance.status}${provenance.attestationSource === "rekor" ? " (from Rekor)" : ""}`,
   );
 
-  const source = chooseSource(provenance, options);
+  const source = chooseSource(provenance, options, log);
   const release = readTarball(artifact.tarball);
 
   let rebuild: RebuildResult | undefined;

@@ -194,6 +194,14 @@ describe("file rules on crafted tarballs", () => {
   });
 
   it.each([
+    ".env",
+    ".env.local",
+    ".env.production",
+    ".env.development.local",
+    "config/.env",
+    "config/.env.local",
+    ".npmrc",
+    "packages/a/.npmrc",
     "server.key",
     "certs/server.pem",
     "certs/client.p12",
@@ -201,6 +209,11 @@ describe("file rules on crafted tarballs", () => {
     "certs/SERVER.KEY",
     "id_rsa",
     "nested/id_rsa",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "id_ed25519_sk",
+    "nested/id_ecdsa_sk",
     ".git-credentials",
     "nested/.git-credentials",
     ".netrc",
@@ -233,12 +246,19 @@ describe("file rules on crafted tarballs", () => {
   it("does not flag similar names outside credential path boundaries", () => {
     const release = clean(
       [
+        ".env.example",
+        ".env.sample",
+        ".env.template",
+        "config/.env.example",
+        "lib/env.js",
+        "my.env",
         "lib/keyring.js",
         "lib/monkey",
         "server.key.js",
         "cert.pem.bak",
         "client.p12.txt",
         "id_rsa.pub",
+        "id_ed25519.pub",
         "not_id_rsa",
         ".git-credentials.example",
         "my.netrc",
