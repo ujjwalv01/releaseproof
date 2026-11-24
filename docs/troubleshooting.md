@@ -91,7 +91,7 @@ depth, except those inside `node_modules`. Common causes include:
 
 - Passing the wrong `--repo` or an older/newer `--commit` before the package existed.
 - A package that was renamed or generated dynamically during release.
-- A monorepo where the package lives deeper than the scanned workspace directories.
+- A `package.json` that is not valid JSON at that commit; the inspection skips such files.
 
 **What to try:** Check the repository tree at that commit on GitHub to confirm where the
 package's `package.json` lives and verify `--repo` and `--commit`.
