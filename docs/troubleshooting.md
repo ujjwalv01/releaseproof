@@ -85,8 +85,9 @@ an abbreviated SHA, tag name, or branch ref.
 
 **Message as printed:** `package <name> was not found in the repository at this commit`
 
-**What it means:** None of the `package.json` files discovered in the repository (up to depth 4)
-has `"name": "<name>"` at the checked-out commit. Common causes include:
+**What it means:** None of the `package.json` files tracked in the repository has
+`"name": "<name>"` at the checked-out commit. Every tracked `package.json` is read, at any
+depth, except those inside `node_modules`. Common causes include:
 
 - Passing the wrong `--repo` or an older/newer `--commit` before the package existed.
 - A package that was renamed or generated dynamically during release.
