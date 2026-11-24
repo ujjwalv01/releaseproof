@@ -66,7 +66,9 @@ jobs:
         with:
           create-issue: "false"
       - if: always() && steps.check.outputs.highest-severity == 'critical'
-        run: echo "Critical finding (${{ steps.check.outputs.findings }} total)"
+        run: echo "Critical finding ($FINDINGS total)"
+        env:
+          FINDINGS: ${{ steps.check.outputs.findings }}
       - uses: actions/upload-artifact@<sha>
         if: always()
         with:
