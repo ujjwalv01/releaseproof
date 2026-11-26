@@ -93,6 +93,13 @@ function tail(text: string): string {
   return text.length > OUTPUT_TAIL ? `…${text.slice(-OUTPUT_TAIL)}` : text;
 }
 
+function formatTimeout(timeoutMs: number): string {
+  if (timeoutMs > 0 && timeoutMs % 60_000 === 0) {
+    return `${timeoutMs / 60_000} min`;
+  }
+  return `${Math.round(timeoutMs / 1000)} s`;
+}
+
 function textTail(result: ContainerResult, includeStdout: boolean): string {
   const parts = [result.stderr];
   if (includeStdout) {
@@ -156,9 +163,9 @@ export async function rebuildPackage(
     return outcome;
   }
 
-  function stageFailure(stage: StageName, outcome: ContainerResult): string {
+  function stageFailure(stage: StageName, outcome: ContainerResult, timeoutMs: number): string {
     const why = outcome.timedOut
-      ? "timed out"
+      ? `timed out after ${formatTimeout(timeoutMs)}`
       : `exited with code ${outcome.exitCode ?? "unknown"}`;
     return `${stage} stage ${why}`;
   }
@@ -169,6 +176,7 @@ export async function rebuildPackage(
   try {
     await docker.pull(baseImage);
 
+    const initTimeoutMs = 60_000;
     const init = await runStage(
       "init",
       {
@@ -176,7 +184,7 @@ export async function rebuildPackage(
         network: "none",
         env: {},
         argv: ["bash", "-c", INIT_SCRIPT],
-        timeoutMs: 60_000,
+        timeoutMs: initTimeoutMs,
         user: "0:0",
         // Root in the container still lacks CAP_CHOWN after --cap-drop ALL; the volume is
         // empty at this point, so granting it here exposes nothing.
@@ -185,7 +193,7 @@ export async function rebuildPackage(
       true,
     );
     if (init.exitCode !== 0) {
-      return fail(stageFailure("init", init));
+      return fail(stageFailure("init", init, initTimeoutMs));
     }
 
     const cloneEnv: Record<string, string> = {
@@ -208,7 +216,7 @@ export async function rebuildPackage(
       false,
     );
     if (clone.exitCode !== 0) {
-      return fail(stageFailure("clone", clone));
+      return fail(stageFailure("clone", clone, timeouts.cloneMs));
     }
     const stdout = clone.stdout.toString("utf8");
     const markerAt = stdout.lastIndexOf(`${INSPECTION_MARKER}\n`);
@@ -257,7 +265,7 @@ export async function rebuildPackage(
         true, // package managers print their errors on stdout as often as stderr
       );
       if (install.exitCode !== 0) {
-        return fail(stageFailure("install", install));
+        return fail(stageFailure("install", install, timeouts.installMs));
       }
       toolVersion = readToolVersion(install.stdout);
     } else {
@@ -278,7 +286,7 @@ export async function rebuildPackage(
       true,
     );
     if (build.exitCode !== 0) {
-      return fail(stageFailure("build", build));
+      return fail(stageFailure("build", build, timeouts.buildMs));
     }
     toolVersion ??= readToolVersion(build.stdout);
     result.toolVersion = toolVersion
@@ -291,6 +299,7 @@ export async function rebuildPackage(
       return fail("build stage did not report the tarball digest");
     }
 
+    const exportTimeoutMs = 5 * 60_000;
     const exported = await runStage(
       "export",
       {
@@ -298,13 +307,13 @@ export async function rebuildPackage(
         network: "none",
         env: {},
         argv: ["cat", "/work/out/package.tgz"],
-        timeoutMs: 5 * 60_000,
+        timeoutMs: exportTimeoutMs,
         volumeReadOnly: true,
       },
       false,
     );
     if (exported.exitCode !== 0) {
-      return fail(stageFailure("export", exported));
+      return fail(stageFailure("export", exported, exportTimeoutMs));
     }
     const sha = createHash("sha256").update(exported.stdout).digest("hex");
     if (sha !== expectedSha) {

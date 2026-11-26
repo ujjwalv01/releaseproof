@@ -73933,6 +73933,12 @@ function readToolVersion(stdout) {
 function tail(text) {
   return text.length > OUTPUT_TAIL ? `\u2026${text.slice(-OUTPUT_TAIL)}` : text;
 }
+function formatTimeout(timeoutMs) {
+  if (timeoutMs > 0 && timeoutMs % 6e4 === 0) {
+    return `${timeoutMs / 6e4} min`;
+  }
+  return `${Math.round(timeoutMs / 1e3)} s`;
+}
 function textTail(result, includeStdout) {
   const parts = [result.stderr];
   if (includeStdout) {
@@ -73978,8 +73984,8 @@ async function rebuildPackage(source, target, options = {}) {
     });
     return outcome;
   }
-  function stageFailure(stage, outcome) {
-    const why = outcome.timedOut ? "timed out" : `exited with code ${outcome.exitCode ?? "unknown"}`;
+  function stageFailure(stage, outcome, timeoutMs) {
+    const why = outcome.timedOut ? `timed out after ${formatTimeout(timeoutMs)}` : `exited with code ${outcome.exitCode ?? "unknown"}`;
     return `${stage} stage ${why}`;
   }
   const serverVersion = await docker.serverVersion();
@@ -73987,6 +73993,7 @@ async function rebuildPackage(source, target, options = {}) {
   await docker.createVolume(volume);
   try {
     await docker.pull(baseImage);
+    const initTimeoutMs = 6e4;
     const init = await runStage(
       "init",
       {
@@ -73994,7 +74001,7 @@ async function rebuildPackage(source, target, options = {}) {
         network: "none",
         env: {},
         argv: ["bash", "-c", INIT_SCRIPT],
-        timeoutMs: 6e4,
+        timeoutMs: initTimeoutMs,
         user: "0:0",
         // Root in the container still lacks CAP_CHOWN after --cap-drop ALL; the volume is
         // empty at this point, so granting it here exposes nothing.
@@ -74003,7 +74010,7 @@ async function rebuildPackage(source, target, options = {}) {
       true
     );
     if (init.exitCode !== 0) {
-      return fail2(stageFailure("init", init));
+      return fail2(stageFailure("init", init, initTimeoutMs));
     }
     const cloneEnv = {
       RP_REPOSITORY: source.repository,
@@ -74025,7 +74032,7 @@ async function rebuildPackage(source, target, options = {}) {
       false
     );
     if (clone.exitCode !== 0) {
-      return fail2(stageFailure("clone", clone));
+      return fail2(stageFailure("clone", clone, timeouts.cloneMs));
     }
     const stdout = clone.stdout.toString("utf8");
     const markerAt = stdout.lastIndexOf(`${INSPECTION_MARKER}
@@ -74074,7 +74081,7 @@ async function rebuildPackage(source, target, options = {}) {
         // package managers print their errors on stdout as often as stderr
       );
       if (install.exitCode !== 0) {
-        return fail2(stageFailure("install", install));
+        return fail2(stageFailure("install", install, timeouts.installMs));
       }
       toolVersion = readToolVersion(install.stdout);
     } else {
@@ -74094,7 +74101,7 @@ async function rebuildPackage(source, target, options = {}) {
       true
     );
     if (build.exitCode !== 0) {
-      return fail2(stageFailure("build", build));
+      return fail2(stageFailure("build", build, timeouts.buildMs));
     }
     toolVersion ??= readToolVersion(build.stdout);
     result.toolVersion = toolVersion ? `${buildPlan.manager.name.replace("-berry", "").replace("-classic", "")} ${toolVersion}` : void 0;
@@ -74104,6 +74111,7 @@ async function rebuildPackage(source, target, options = {}) {
     if (!expectedSha) {
       return fail2("build stage did not report the tarball digest");
     }
+    const exportTimeoutMs = 5 * 6e4;
     const exported = await runStage(
       "export",
       {
@@ -74111,13 +74119,13 @@ async function rebuildPackage(source, target, options = {}) {
         network: "none",
         env: {},
         argv: ["cat", "/work/out/package.tgz"],
-        timeoutMs: 5 * 6e4,
+        timeoutMs: exportTimeoutMs,
         volumeReadOnly: true
       },
       false
     );
     if (exported.exitCode !== 0) {
-      return fail2(stageFailure("export", exported));
+      return fail2(stageFailure("export", exported, exportTimeoutMs));
     }
     const sha = createHash4("sha256").update(exported.stdout).digest("hex");
     if (sha !== expectedSha) {

@@ -216,11 +216,17 @@ describe("rebuildPackage", () => {
     expect(docker.stages()).toEqual(["init", "clone"]);
   });
 
-  it("reports a timed-out build and a digest mismatch on export", async () => {
+  it("reports a timed-out build with its time limit and a digest mismatch on export", async () => {
     const timedOut = happyPath({ build: () => ({ exitCode: null, timedOut: true }) });
     expect((await rebuildPackage(source, target, { docker: timedOut })).failure).toBe(
-      "build stage timed out",
+      "build stage timed out after 30 min",
     );
+
+    const shortLimit = happyPath({ build: () => ({ exitCode: null, timedOut: true }) });
+    expect(
+      (await rebuildPackage(source, target, { docker: shortLimit, timeouts: { buildMs: 90_000 } }))
+        .failure,
+    ).toBe("build stage timed out after 90 s");
 
     const tampered = happyPath({ export: () => ({ stdout: Buffer.from("different bytes") }) });
     const result = await rebuildPackage(source, target, { docker: tampered });
