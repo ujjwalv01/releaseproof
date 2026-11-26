@@ -19,6 +19,12 @@ export interface ActionIo {
   warning(message: string): void;
   writeSummary(markdown: string): Promise<void>;
   writeFile(relativePath: string, contents: string): void;
+  findOpenIssue(args: {
+    token: string;
+    title: string;
+    labels: string[];
+  }): Promise<{ number: number; url: string } | undefined>;
+  commentOnIssue(args: { token: string; issueNumber: number; body: string }): Promise<void>;
   createIssue(args: {
     token: string;
     title: string;
@@ -26,6 +32,43 @@ export interface ActionIo {
     labels: string[];
   }): Promise<string>;
   check(options: Parameters<typeof runCheck>[0]): Promise<CheckReport>;
+}
+
+async function reportIssue(
+  io: ActionIo,
+  args: { token: string; title: string; body: string; labels: string[] },
+): Promise<void> {
+  let existing: { number: number; url: string } | undefined;
+  try {
+    existing = await io.findOpenIssue({
+      token: args.token,
+      title: args.title,
+      labels: args.labels,
+    });
+  } catch (error) {
+    io.warning(
+      `could not check for an existing issue: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  try {
+    if (existing) {
+      await io.commentOnIssue({
+        token: args.token,
+        issueNumber: existing.number,
+        body: args.body,
+      });
+      io.setOutput("issue-url", existing.url);
+      io.info(`commented on ${existing.url}`);
+    } else {
+      const url = await io.createIssue(args);
+      io.setOutput("issue-url", url);
+      io.info(`opened ${url}`);
+    }
+  } catch (error) {
+    io.warning(
+      `could not open an issue (does the job have "issues: write"?): ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 function shouldFail(exitCode: ExitCode, failOn: ActionInputs["failOn"]): boolean {
@@ -77,20 +120,12 @@ export async function runAction(io: ActionIo): Promise<void> {
       const markdown = renderToolErrorMarkdown(error.message, { runUrl: io.context.runUrl });
       await io.writeSummary(markdown);
       if (inputs.createIssue) {
-        try {
-          const url = await io.createIssue({
-            token: inputs.token,
-            title: "releaseproof: could not verify",
-            body: markdown,
-            labels: inputs.issueLabels,
-          });
-          io.setOutput("issue-url", url);
-          io.info(`opened ${url}`);
-        } catch (issueError) {
-          io.warning(
-            `could not open an issue (does the job have "issues: write"?): ${issueError instanceof Error ? issueError.message : String(issueError)}`,
-          );
-        }
+        await reportIssue(io, {
+          token: inputs.token,
+          title: "releaseproof: could not verify",
+          body: markdown,
+          labels: inputs.issueLabels,
+        });
       }
       io.setFailed(`could not verify: ${error.message}`);
       return;
@@ -115,20 +150,12 @@ export async function runAction(io: ActionIo): Promise<void> {
   await io.writeSummary(markdown);
 
   if (inputs.createIssue && report.verdict.status !== "matches-source") {
-    try {
-      const url = await io.createIssue({
-        token: inputs.token,
-        title: issueTitle(report),
-        body: markdown,
-        labels: inputs.issueLabels,
-      });
-      io.setOutput("issue-url", url);
-      io.info(`opened ${url}`);
-    } catch (error) {
-      io.warning(
-        `could not open an issue (does the job have "issues: write"?): ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    await reportIssue(io, {
+      token: inputs.token,
+      title: issueTitle(report),
+      body: markdown,
+      labels: inputs.issueLabels,
+    });
   }
 
   if (shouldFail(report.verdict.exitCode, inputs.failOn)) {

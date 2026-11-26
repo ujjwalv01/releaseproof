@@ -56,7 +56,14 @@ function fakeIo(
     warnings: [] as string[],
     summaries: [] as string[],
     files: {} as Record<string, string>,
-    issues: [] as Array<{ title: string; body: string; labels: string[] }>,
+    issues: [] as Array<{
+      number: number;
+      url: string;
+      title: string;
+      body: string;
+      labels: string[];
+    }>,
+    comments: [] as Array<{ issueNumber: number; body: string }>,
   };
   const actionIo: ActionIo = {
     getInput: (name) => inputs[name] ?? "",
@@ -86,9 +93,20 @@ function fakeIo(
     writeFile: (relativePath, contents) => {
       io.files[relativePath] = contents;
     },
+    findOpenIssue: async ({ title, labels }) => {
+      const match = io.issues.find(
+        (issue) => issue.title === title && labels.every((label) => issue.labels.includes(label)),
+      );
+      return match ? { number: match.number, url: match.url } : undefined;
+    },
+    commentOnIssue: async ({ issueNumber, body }) => {
+      io.comments.push({ issueNumber, body });
+    },
     createIssue: async ({ title, body, labels }) => {
-      io.issues.push({ title, body, labels });
-      return "https://github.com/ujjwalv01/releaseproof/issues/1";
+      const number = io.issues.length + 1;
+      const url = `https://github.com/ujjwalv01/releaseproof/issues/${number}`;
+      io.issues.push({ number, url, title, body, labels });
+      return url;
     },
     check,
     ...overrides,
@@ -303,5 +321,77 @@ describe("runAction", () => {
       /could not open an issue .*issues: write.*Resource not accessible/,
     );
     expect(io.failures).toEqual(["DIFFERS-FROM-SOURCE: because"]);
+  });
+
+  it("reuses an open issue by commenting on it when the package, version and verdict match", async () => {
+    const { io, actionIo } = fakeIo(
+      { "create-issue": "true", "issue-labels": "security", token: "t" },
+      async () => reportWith("differs-from-source", 1),
+    );
+    await runAction(actionIo);
+    await runAction(actionIo);
+
+    expect(io.issues).toHaveLength(1);
+    expect(io.comments).toHaveLength(1);
+    expect(io.comments[0]?.issueNumber).toBe(1);
+    expect(io.outputs["issue-url"]).toBe("https://github.com/ujjwalv01/releaseproof/issues/1");
+  });
+
+  it("opens a new issue when the version or verdict differs", async () => {
+    let report = reportWith("differs-from-source", 1);
+    const { io, actionIo } = fakeIo(
+      { "create-issue": "true", "issue-labels": "security", token: "t" },
+      async () => report,
+    );
+    await runAction(actionIo);
+
+    report = reportWith("could-not-verify", 2);
+    await runAction(actionIo);
+
+    report = {
+      ...reportWith("differs-from-source", 1),
+      package: { ...reportWith("differs-from-source", 1).package, version: "1.2.4" },
+    };
+    await runAction(actionIo);
+
+    expect(io.issues).toHaveLength(3);
+    expect(io.comments).toHaveLength(0);
+    expect(io.outputs["issue-url"]).toBe("https://github.com/ujjwalv01/releaseproof/issues/3");
+  });
+
+  it("reuses the open issue on repeated tool errors", async () => {
+    const { io, actionIo } = fakeIo(
+      { "create-issue": "true", "issue-labels": "security", token: "t" },
+      async () => {
+        throw new ToolError("registry is unreachable");
+      },
+    );
+    await runAction(actionIo);
+    await runAction(actionIo);
+
+    expect(io.issues).toHaveLength(1);
+    expect(io.issues[0]?.title).toBe("releaseproof: could not verify");
+    expect(io.comments).toHaveLength(1);
+    expect(io.comments[0]?.issueNumber).toBe(1);
+    expect(io.outputs["issue-url"]).toBe("https://github.com/ujjwalv01/releaseproof/issues/1");
+  });
+
+  it("warns and opens a new issue if looking up an existing issue fails", async () => {
+    const { io, actionIo } = fakeIo(
+      { "create-issue": "true", token: "t" },
+      async () => reportWith("differs-from-source", 1),
+      {
+        findOpenIssue: async () => {
+          throw new Error("API rate limit exceeded");
+        },
+      },
+    );
+    await runAction(actionIo);
+
+    expect(io.warnings[0]).toMatch(
+      /could not check for an existing issue: API rate limit exceeded/,
+    );
+    expect(io.issues).toHaveLength(1);
+    expect(io.outputs["issue-url"]).toBe("https://github.com/ujjwalv01/releaseproof/issues/1");
   });
 });

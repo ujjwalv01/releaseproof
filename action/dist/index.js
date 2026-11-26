@@ -75725,6 +75725,39 @@ ${footer}
 }
 
 // src/main.ts
+async function reportIssue(io2, args) {
+  let existing;
+  try {
+    existing = await io2.findOpenIssue({
+      token: args.token,
+      title: args.title,
+      labels: args.labels
+    });
+  } catch (error2) {
+    io2.warning(
+      `could not check for an existing issue: ${error2 instanceof Error ? error2.message : String(error2)}`
+    );
+  }
+  try {
+    if (existing) {
+      await io2.commentOnIssue({
+        token: args.token,
+        issueNumber: existing.number,
+        body: args.body
+      });
+      io2.setOutput("issue-url", existing.url);
+      io2.info(`commented on ${existing.url}`);
+    } else {
+      const url = await io2.createIssue(args);
+      io2.setOutput("issue-url", url);
+      io2.info(`opened ${url}`);
+    }
+  } catch (error2) {
+    io2.warning(
+      `could not open an issue (does the job have "issues: write"?): ${error2 instanceof Error ? error2.message : String(error2)}`
+    );
+  }
+}
 function shouldFail(exitCode, failOn) {
   switch (failOn) {
     case "never":
@@ -75769,20 +75802,12 @@ async function runAction(io2) {
       const markdown2 = renderToolErrorMarkdown(error2.message, { runUrl: io2.context.runUrl });
       await io2.writeSummary(markdown2);
       if (inputs.createIssue) {
-        try {
-          const url = await io2.createIssue({
-            token: inputs.token,
-            title: "releaseproof: could not verify",
-            body: markdown2,
-            labels: inputs.issueLabels
-          });
-          io2.setOutput("issue-url", url);
-          io2.info(`opened ${url}`);
-        } catch (issueError) {
-          io2.warning(
-            `could not open an issue (does the job have "issues: write"?): ${issueError instanceof Error ? issueError.message : String(issueError)}`
-          );
-        }
+        await reportIssue(io2, {
+          token: inputs.token,
+          title: "releaseproof: could not verify",
+          body: markdown2,
+          labels: inputs.issueLabels
+        });
       }
       io2.setFailed(`could not verify: ${error2.message}`);
       return;
@@ -75805,20 +75830,12 @@ async function runAction(io2) {
   });
   await io2.writeSummary(markdown);
   if (inputs.createIssue && report.verdict.status !== "matches-source") {
-    try {
-      const url = await io2.createIssue({
-        token: inputs.token,
-        title: issueTitle(report),
-        body: markdown,
-        labels: inputs.issueLabels
-      });
-      io2.setOutput("issue-url", url);
-      io2.info(`opened ${url}`);
-    } catch (error2) {
-      io2.warning(
-        `could not open an issue (does the job have "issues: write"?): ${error2 instanceof Error ? error2.message : String(error2)}`
-      );
-    }
+    await reportIssue(io2, {
+      token: inputs.token,
+      title: issueTitle(report),
+      body: markdown,
+      labels: inputs.issueLabels
+    });
   }
   if (shouldFail(report.verdict.exitCode, inputs.failOn)) {
     io2.setFailed(report.verdict.summary);
@@ -75849,6 +75866,25 @@ await runAction({
     const file = path12.join(workspace, relativePath);
     mkdirSync(path12.dirname(file), { recursive: true });
     writeFileSync2(file, contents);
+  },
+  findOpenIssue: async ({ token, title, labels }) => {
+    const octokit = getOctokit(token);
+    const { data } = await octokit.rest.issues.listForRepo({
+      ...context3.repo,
+      state: "open",
+      ...labels.length > 0 ? { labels: labels.join(",") } : {},
+      per_page: 100
+    });
+    const match = data.find((issue2) => !issue2.pull_request && issue2.title === title);
+    return match ? { number: match.number, url: match.html_url } : void 0;
+  },
+  commentOnIssue: async ({ token, issueNumber, body }) => {
+    const octokit = getOctokit(token);
+    await octokit.rest.issues.createComment({
+      ...context3.repo,
+      issue_number: issueNumber,
+      body
+    });
   },
   createIssue: async ({ token, title, body, labels }) => {
     const octokit = getOctokit(token);
