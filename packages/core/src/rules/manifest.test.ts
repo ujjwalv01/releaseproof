@@ -78,6 +78,9 @@ describe("manifestRules", () => {
     expect(findings({ ...base, dependencies: { a: "^2.0.0" } }, base)).toEqual([
       "medium:dependency-changed",
     ]);
+    expect(findings({ ...base, dependencies: { a: "*" } }, base)).toEqual([
+      "medium:dependency-changed",
+    ]);
     expect(findings({ ...base, dependencies: {} }, base)).toEqual(["low:dependency-removed"]);
     expect(findings({ ...base, optionalDependencies: { c: "*" } }, base)).toEqual([
       "high:dependency-added",
@@ -85,6 +88,42 @@ describe("manifestRules", () => {
     expect(findings({ ...base, bundleDependencies: ["a"] }, base)).toEqual([
       "high:dependency-added",
     ]);
+  });
+
+  it("raises dependency-changed to high when a registry range is repointed to a non-registry spec or alias", () => {
+    const nonRegistrySpecs = [
+      "git+https://github.com/someone/lodash.git",
+      "git://github.com/someone/lodash.git",
+      "git@github.com:someone/lodash.git",
+      "github:someone/lodash",
+      "gitlab:someone/lodash",
+      "bitbucket:someone/lodash",
+      "gist:1234567890abcdef",
+      "https://example.com/lodash-4.17.21.tgz",
+      "http://example.com/lodash-4.17.21.tgz",
+      "npm:lodash-fork@4.17.21",
+      "file:../vendor/lodash",
+      "link:../vendor/lodash",
+      "someone/lodash",
+      "someone/lodash#main",
+    ];
+    for (const spec of nonRegistrySpecs) {
+      const result = manifestRules(
+        ruleContext(
+          tarballWithManifest({ ...base, dependencies: { a: spec } }),
+          tarballWithManifest(base),
+        ),
+      );
+      expect(result.map((f) => `${f.severity}:${f.id}`)).toEqual(["high:dependency-changed"]);
+      expect(result[0]?.detail).toContain("non-registry URL, local path or package alias");
+    }
+
+    expect(
+      findings(
+        { ...base, dependencies: { a: "git+https://github.com/someone/lodash.git#v2" } },
+        { ...base, dependencies: { a: "git+https://github.com/someone/lodash.git#v1" } },
+      ),
+    ).toEqual(["medium:dependency-changed"]);
   });
 
   it("flags changed entry points as high and other field changes as medium", () => {
