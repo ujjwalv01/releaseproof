@@ -219,7 +219,9 @@ describe("fetchPublished", () => {
     const { fetch } = registryFetch({ [`${REGISTRY}sigstore/5.0.0`]: json("", 404) });
     await expect(
       fetchPublished("sigstore@5.0.0", { fetch, env: {}, npmrcPaths: [] }),
-    ).rejects.toThrow(/sigstore@5.0.0 was not found on https:\/\/registry.npmjs.org\//);
+    ).rejects.toThrow(
+      /sigstore@5.0.0 was not found on https:\/\/registry\.npmjs\.org\/\. If it was just published, retry in a minute or run the check after the publish job \(needs: publish\)\. A staged version that is not approved yet is checked with --stage <id>\./,
+    );
   });
 
   it("surfaces registry failures as ToolError", async () => {

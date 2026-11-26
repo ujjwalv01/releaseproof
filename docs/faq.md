@@ -182,6 +182,49 @@ npx releaseproof check --stage <stage-id> --repo https://github.com/<owner>/<rep
 
 ---
 
+## `was not found` right after publishing
+
+`releaseproof check` can report `<package>@<version> was not found` in three common situations:
+
+1. **Published moments ago:** the registry does not serve the new version yet, for example when
+   the Action runs on `release: published` while another workflow is still running `npm publish`.
+2. **Staged, not approved yet:** a version created with `npm stage publish` is not served as a
+   published version until it is approved. Check it with `--stage <id>` (or the Action's `stage`
+   input); see [how to check a staged version](#how-do-i-check-a-staged-version---stage-token-requirements).
+3. **A typo** in the package name or version.
+
+To avoid racing `npm publish` in GitHub Actions, run the Action as a step after `npm publish` in
+the same job, or in a separate job with `needs: publish`:
+
+```yaml
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: npm publish --provenance
+
+  verify:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ujjwalv01/releaseproof@v0.2.2 # or pin the commit SHA of the tag
+```
+
+If you run `releaseproof check` locally right after publishing, retry after a minute.
+
+---
+
 ## Does `--offline` disable all network access?
 
 No. `--offline` only tells Sigstore to prefer its cached trust root over refreshing it, and

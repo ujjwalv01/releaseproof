@@ -64511,7 +64511,9 @@ async function fetchPublished(input, options = {}) {
   const specString = `${spec.name}@${spec.version}`;
   const manifest = await registryJson(versionPath(spec), requestOptions);
   if (manifest === null) {
-    throw new ToolError(`${specString} was not found on ${registry}`);
+    throw new ToolError(
+      `${specString} was not found on ${registry}. If it was just published, retry in a minute or run the check after the publish job (needs: publish). A staged version that is not approved yet is checked with --stage <id>.`
+    );
   }
   if (!isRecord(manifest) || manifest.name !== spec.name || manifest.version !== spec.version) {
     const got = isRecord(manifest) ? `${String(manifest.name)}@${String(manifest.version)}` : "an unexpected document";
