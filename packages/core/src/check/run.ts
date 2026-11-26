@@ -257,19 +257,21 @@ export async function runCheck(
 
   let artifact: ReleaseArtifact;
   if (options.stageId) {
+    const expected = options.spec ? parseSpec(options.spec) : undefined;
     log(`fetching staged version ${options.stageId}`);
     artifact = await deps.fetchStaged(options.stageId, registryOptions);
-    if (options.spec) {
-      const expected = parseSpec(options.spec);
+    if (expected) {
       if (expected.name !== artifact.name || expected.version !== artifact.version) {
         throw new ToolError(
-          `Staged ${options.stageId} is ${artifact.name}@${artifact.version}, not ${options.spec}`,
+          `Staged ${options.stageId} is ${artifact.name}@${artifact.version}, not ${expected.name}@${expected.version}`,
         );
       }
     }
   } else if (options.spec) {
-    log(`fetching ${options.spec}`);
-    artifact = await deps.fetchPublished(options.spec, registryOptions);
+    const parsed = parseSpec(options.spec);
+    const normalizedSpec = `${parsed.name}@${parsed.version}`;
+    log(`fetching ${normalizedSpec}`);
+    artifact = await deps.fetchPublished(normalizedSpec, registryOptions);
   } else {
     throw new ToolError("Give a package as <name>@<version>, or --stage <id> for a staged version");
   }

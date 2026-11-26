@@ -64381,7 +64381,8 @@ function resolveToken(registry, options = {}) {
 
 // ../packages/core/src/registry/spec.ts
 var NAME_RE = /^(@[A-Za-z0-9-~][A-Za-z0-9-._~]*\/)?[A-Za-z0-9-~][A-Za-z0-9-._~]*$/;
-var VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+var VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+var BUILD_METADATA_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\+[0-9A-Za-z.-]+$/;
 function parseSpec(input) {
   const at2 = input.lastIndexOf("@");
   if (at2 <= 0) {
@@ -64393,12 +64394,18 @@ function parseSpec(input) {
     throw new ToolError(`Expected <name>@<version>, got "${input}"`);
   }
   const name = input.slice(0, at2);
-  const version = input.slice(at2 + 1);
+  const rawVersion = input.slice(at2 + 1);
   if (name.length > 214 || !NAME_RE.test(name)) {
     throw new ToolError(`Invalid package name "${name}"`);
   }
+  const version = rawVersion.replace(/^[v=]/, "");
+  if (BUILD_METADATA_RE.test(version)) {
+    throw new ToolError(
+      `npm never publishes versions with build metadata ("${rawVersion}"); use ${version.split("+")[0]}`
+    );
+  }
   if (!VERSION_RE.test(version)) {
-    throw new ToolError(`Expected an exact version such as 1.2.3, got "${version}"`);
+    throw new ToolError(`Expected an exact version such as 1.2.3, got "${rawVersion}"`);
   }
   return { name, version, purl: toPurl(name, version) };
 }
@@ -75185,19 +75192,21 @@ async function runCheck(options, deps = defaultDeps) {
   };
   let artifact;
   if (options.stageId) {
+    const expected = options.spec ? parseSpec(options.spec) : void 0;
     log(`fetching staged version ${options.stageId}`);
     artifact = await deps.fetchStaged(options.stageId, registryOptions);
-    if (options.spec) {
-      const expected = parseSpec(options.spec);
+    if (expected) {
       if (expected.name !== artifact.name || expected.version !== artifact.version) {
         throw new ToolError(
-          `Staged ${options.stageId} is ${artifact.name}@${artifact.version}, not ${options.spec}`
+          `Staged ${options.stageId} is ${artifact.name}@${artifact.version}, not ${expected.name}@${expected.version}`
         );
       }
     }
   } else if (options.spec) {
-    log(`fetching ${options.spec}`);
-    artifact = await deps.fetchPublished(options.spec, registryOptions);
+    const parsed = parseSpec(options.spec);
+    const normalizedSpec = `${parsed.name}@${parsed.version}`;
+    log(`fetching ${normalizedSpec}`);
+    artifact = await deps.fetchPublished(normalizedSpec, registryOptions);
   } else {
     throw new ToolError("Give a package as <name>@<version>, or --stage <id> for a staged version");
   }
