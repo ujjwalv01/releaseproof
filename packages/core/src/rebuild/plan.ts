@@ -215,7 +215,7 @@ function chooseNode(
     if (resolved) {
       return finish(resolved);
     }
-    unreadable.push({ name, value: contents.trim() });
+    unreadable.push({ name, value: (contents.trim().split(/\r?\n/)[0] ?? "").slice(0, 40) });
   }
   const tool = inspection.nodeVersionFiles[".tool-versions"];
   const toolLine = tool ? /^nodejs\s+(\S+)/m.exec(tool)?.[1] : undefined;

@@ -504,6 +504,24 @@ describe("planBuild: Node version", () => {
     );
   });
 
+  it("quotes only the first line of a multi-line unreadable .nvmrc", () => {
+    const longFirstLine = "a".repeat(60);
+    const result = plan(
+      inspection({
+        packages: [{ ...single, engines: { node: ">=20" } }],
+        nodeVersionFiles: { ".nvmrc": `${longFirstLine}\ninjected second line\n` },
+      }),
+    );
+    expect(result.nodeMajor).toBe(20);
+    expect(result.warnings).toContain(
+      `.nvmrc "${"a".repeat(40)}" not understood; using Node 20 (engines.node ">=20")`,
+    );
+    for (const warning of result.warnings) {
+      expect(warning).not.toContain("\n");
+      expect(warning).not.toContain("\r");
+    }
+  });
+
   it("lets --node and --image override everything", () => {
     expect(
       plan(inspection({ packages: [single], workflow: "node-version: 20\n" }), undefined, {
