@@ -112,6 +112,8 @@ export interface PlanInput {
 export type PlanResult = { ok: true; plan: BuildPlan } | { ok: false; reason: string };
 
 const NODE_CODENAMES: Record<string, number> = {
+  fermium: 14,
+  gallium: 16,
   hydrogen: 18,
   iron: 20,
   jod: 22,
@@ -132,6 +134,31 @@ export function parseNodeMajor(text: string): number | undefined {
   return majors.length > 0 ? Math.min(...majors) : undefined;
 }
 
+function resolveNodeSpec(
+  raw: string,
+  label: string,
+  includeRawInSource = false,
+): { major: number; source: string } | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (/^(lts\/\*|latest|current|node)$/i.test(trimmed)) {
+    return {
+      major: 24,
+      source: `${label} "${trimmed}" (assumed 24; use --node to override)`,
+    };
+  }
+  const major = parseNodeMajor(trimmed);
+  if (major === undefined) {
+    return undefined;
+  }
+  return {
+    major,
+    source: includeRawInSource ? `${label} "${trimmed}"` : label,
+  };
+}
+
 function nodeFromWorkflow(
   workflow: string,
   files: Record<string, string>,
@@ -140,23 +167,18 @@ function nodeFromWorkflow(
   if (file) {
     const name = file.replace(/^\.\//, "");
     const contents = files[name];
-    const major = contents ? parseNodeMajor(contents) : undefined;
-    if (major !== undefined) {
-      return { major, source: `workflow node-version-file ${name}` };
+    const resolved = contents
+      ? resolveNodeSpec(contents, `workflow node-version-file ${name}`)
+      : undefined;
+    if (resolved) {
+      return resolved;
     }
   }
   const raw = /node-version:\s*['"]?([^'"\n]+)/.exec(workflow)?.[1]?.trim();
   if (!raw || raw.includes("${{")) {
     return undefined;
   }
-  if (/^(lts\/\*|latest|current|node)$/.test(raw)) {
-    return {
-      major: 24,
-      source: `workflow node-version "${raw}" (assumed 24; use --node to override)`,
-    };
-  }
-  const major = parseNodeMajor(raw);
-  return major === undefined ? undefined : { major, source: `workflow node-version "${raw}"` };
+  return resolveNodeSpec(raw, "workflow node-version", true);
 }
 
 function chooseNode(
@@ -164,6 +186,7 @@ function chooseNode(
   pkg: PackageInfo,
   root: PackageInfo | undefined,
   overrides: PlanOverrides,
+  warnings: string[],
 ): { major: number; source: string } {
   if (overrides.nodeMajor !== undefined) {
     return { major: overrides.nodeMajor, source: "--node option" };
@@ -174,18 +197,31 @@ function chooseNode(
       return fromWorkflow;
     }
   }
+  const unreadable: Array<{ name: string; value: string }> = [];
+  const finish = (chosen: { major: number; source: string }) => {
+    for (const file of unreadable) {
+      warnings.push(
+        `${file.name} "${file.value}" not understood; using Node ${chosen.major} (${chosen.source})`,
+      );
+    }
+    return chosen;
+  };
   for (const name of [".nvmrc", ".node-version"]) {
     const contents = inspection.nodeVersionFiles[name];
-    const major = contents ? parseNodeMajor(contents) : undefined;
-    if (major !== undefined) {
-      return { major, source: name };
+    if (contents === undefined) {
+      continue;
     }
+    const resolved = resolveNodeSpec(contents, name);
+    if (resolved) {
+      return finish(resolved);
+    }
+    unreadable.push({ name, value: contents.trim() });
   }
   const tool = inspection.nodeVersionFiles[".tool-versions"];
   const toolLine = tool ? /^nodejs\s+(\S+)/m.exec(tool)?.[1] : undefined;
   const toolMajor = toolLine ? parseNodeMajor(toolLine) : undefined;
   if (toolMajor !== undefined) {
-    return { major: toolMajor, source: ".tool-versions" };
+    return finish({ major: toolMajor, source: ".tool-versions" });
   }
   for (const [info, label] of [
     [pkg, "engines.node"],
@@ -194,10 +230,10 @@ function chooseNode(
     const range = info?.engines?.node;
     const major = range ? parseNodeMajor(range) : undefined;
     if (major !== undefined) {
-      return { major, source: `${label} "${range}"` };
+      return finish({ major, source: `${label} "${range}"` });
     }
   }
-  return { major: DEFAULT_NODE_MAJOR, source: "default" };
+  return finish({ major: DEFAULT_NODE_MAJOR, source: "default" });
 }
 
 /** A real exact version per manager, used only in the "needs an exact version" message. */
@@ -328,7 +364,7 @@ export function planBuild(input: PlanInput): PlanResult {
     warnings.push("repository uses git submodules; they are cloned at their recorded commits");
   }
 
-  const node = chooseNode(inspection, pkg, root, overrides);
+  const node = chooseNode(inspection, pkg, root, overrides, warnings);
   const image = overrides.image ?? `node:${node.major}-bookworm`;
   const rootDir = root ? REPO_DIR : `${REPO_DIR}/${pkg.dir}`;
   const pkgDir = pkg.dir === "." ? REPO_DIR : `${REPO_DIR}/${pkg.dir}`;

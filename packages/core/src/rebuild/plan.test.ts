@@ -476,6 +476,34 @@ describe("planBuild: Node version", () => {
     });
   });
 
+  it("handles aliases like lts/* and node in .nvmrc and .node-version", () => {
+    expect(
+      plan(inspection({ packages: [single], nodeVersionFiles: { ".nvmrc": "lts/*\n" } })),
+    ).toMatchObject({
+      nodeMajor: 24,
+      nodeSource: '.nvmrc "lts/*" (assumed 24; use --node to override)',
+    });
+    expect(
+      plan(inspection({ packages: [single], nodeVersionFiles: { ".node-version": "node\n" } })),
+    ).toMatchObject({
+      nodeMajor: 24,
+      nodeSource: '.node-version "node" (assumed 24; use --node to override)',
+    });
+  });
+
+  it("warns when .nvmrc or .node-version cannot be understood", () => {
+    const result = plan(
+      inspection({
+        packages: [{ ...single, engines: { node: ">=20" } }],
+        nodeVersionFiles: { ".nvmrc": "lts/argon\n" },
+      }),
+    );
+    expect(result.nodeMajor).toBe(20);
+    expect(result.warnings).toContain(
+      '.nvmrc "lts/argon" not understood; using Node 20 (engines.node ">=20")',
+    );
+  });
+
   it("lets --node and --image override everything", () => {
     expect(
       plan(inspection({ packages: [single], workflow: "node-version: 20\n" }), undefined, {
@@ -495,6 +523,8 @@ describe("parseNodeMajor", () => {
     ["22", 22],
     ["v22.14.0", 22],
     ["20.x", 20],
+    ["lts/fermium", 14],
+    ["lts/gallium", 16],
     ["lts/jod", 22],
     [">=18.17.0", 18],
     ["^20.0.0 || >=22", 20],
