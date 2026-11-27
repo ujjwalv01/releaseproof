@@ -10,9 +10,10 @@ export interface PackageSpec {
 // Accept uppercase for legacy npm packages published before the lowercase-only rule.
 // Keep the published casing, URL-safe characters, optional scope and max 214 chars.
 const NAME_RE = /^(@[A-Za-z0-9-~][A-Za-z0-9-._~]*\/)?[A-Za-z0-9-~][A-Za-z0-9-._~]*$/;
-// An exact semver version. Ranges and tags are rejected on purpose: a verdict must be about
-// one immutable tarball.
-const VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+// An exact semver version without build metadata (npm drops build metadata at publish).
+// Ranges and tags are rejected on purpose: a verdict must be about one immutable tarball.
+const VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+const BUILD_METADATA_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\+[0-9A-Za-z.-]+$/;
 
 /** Parses `<name>@<version>` where the version is exact. */
 export function parseSpec(input: string): PackageSpec {
@@ -26,12 +27,18 @@ export function parseSpec(input: string): PackageSpec {
     throw new ToolError(`Expected <name>@<version>, got "${input}"`);
   }
   const name = input.slice(0, at);
-  const version = input.slice(at + 1);
+  const rawVersion = input.slice(at + 1);
   if (name.length > 214 || !NAME_RE.test(name)) {
     throw new ToolError(`Invalid package name "${name}"`);
   }
+  const version = rawVersion.replace(/^[v=]/, "");
+  if (BUILD_METADATA_RE.test(version)) {
+    throw new ToolError(
+      `npm never publishes versions with build metadata ("${rawVersion}"); use ${version.split("+")[0]}`,
+    );
+  }
   if (!VERSION_RE.test(version)) {
-    throw new ToolError(`Expected an exact version such as 1.2.3, got "${version}"`);
+    throw new ToolError(`Expected an exact version such as 1.2.3, got "${rawVersion}"`);
   }
   return { name, version, purl: toPurl(name, version) };
 }

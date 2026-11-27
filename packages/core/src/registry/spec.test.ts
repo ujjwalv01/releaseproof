@@ -32,9 +32,38 @@ describe("parseSpec", () => {
     });
   });
 
-  it("accepts prerelease and build metadata", () => {
-    expect(parseSpec("pkg@1.0.0-beta.1+build.5").version).toBe("1.0.0-beta.1+build.5");
+  it("accepts prerelease versions", () => {
+    expect(parseSpec("pkg@1.0.0-beta.1")).toEqual({
+      name: "pkg",
+      version: "1.0.0-beta.1",
+      purl: "pkg:npm/pkg@1.0.0-beta.1",
+    });
   });
+
+  it("strips a single leading v or = from the version", () => {
+    expect(parseSpec("left-pad@v1.3.0")).toEqual({
+      name: "left-pad",
+      version: "1.3.0",
+      purl: "pkg:npm/left-pad@1.3.0",
+    });
+    expect(parseSpec("left-pad@=1.3.0")).toEqual({
+      name: "left-pad",
+      version: "1.3.0",
+      purl: "pkg:npm/left-pad@1.3.0",
+    });
+    expect(parseSpec("@scope/pkg@v1.2.3-rc.1")).toEqual({
+      name: "@scope/pkg",
+      version: "1.2.3-rc.1",
+      purl: "pkg:npm/%40scope/pkg@1.2.3-rc.1",
+    });
+  });
+
+  it.each(["pkg@1.2.3+build", "pkg@1.0.0-beta.1+build.5", "pkg@v1.2.3+build"])(
+    "rejects build metadata in %j",
+    (input) => {
+      expect(() => parseSpec(input)).toThrow(/build metadata/);
+    },
+  );
 
   it.each(["sigstore", "@sigstore/verify", "sigstore@", "@5.0.0"])(
     "rejects %j without an exact version",
@@ -63,12 +92,16 @@ describe("parseSpec", () => {
     expect(() => parseSpec(input)).toThrow(new ToolError(message));
   });
 
-  it.each(["sigstore@^5.0.0", "sigstore@latest", "sigstore@5", "sigstore@5.0", "sigstore@v5.0.0"])(
-    "rejects range or tag %j: a verdict must be about one tarball",
-    (input) => {
-      expect(() => parseSpec(input)).toThrow(/exact version/);
-    },
-  );
+  it.each([
+    "sigstore@^5.0.0",
+    "sigstore@latest",
+    "sigstore@5",
+    "sigstore@5.0",
+    "sigstore@vv5.0.0",
+    "sigstore@==5.0.0",
+  ])("rejects range or tag %j: a verdict must be about one tarball", (input) => {
+    expect(() => parseSpec(input)).toThrow(/exact version/);
+  });
 
   it.each([
     ".hidden@1.0.0",

@@ -96,6 +96,14 @@ describe("parseInputs", () => {
     expect(() => parseInputs(inputs({ version: "latest" }), context())).toThrow(/exact version/);
   });
 
+  it("accepts a leading v or = in the version input and normalizes it", () => {
+    expect(parseInputs(inputs({ version: "v1.2.3" }), context()).spec).toBe("releaseproof@1.2.3");
+    expect(parseInputs(inputs({ version: "=1.2.3" }), context()).spec).toBe("releaseproof@1.2.3");
+    expect(() => parseInputs(inputs({ version: "1.2.3+build" }), context())).toThrow(
+      /build metadata/,
+    );
+  });
+
   it("refuses to run on pull_request_target", () => {
     expect(() => parseInputs(inputs({}), context({ eventName: "pull_request_target" }))).toThrow(
       /refuses to run on pull_request_target/,

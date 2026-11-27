@@ -64381,7 +64381,8 @@ function resolveToken(registry, options = {}) {
 
 // ../packages/core/src/registry/spec.ts
 var NAME_RE = /^(@[A-Za-z0-9-~][A-Za-z0-9-._~]*\/)?[A-Za-z0-9-~][A-Za-z0-9-._~]*$/;
-var VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+var VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+var BUILD_METADATA_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\+[0-9A-Za-z.-]+$/;
 function parseSpec(input) {
   const at2 = input.lastIndexOf("@");
   if (at2 <= 0) {
@@ -64393,12 +64394,18 @@ function parseSpec(input) {
     throw new ToolError(`Expected <name>@<version>, got "${input}"`);
   }
   const name = input.slice(0, at2);
-  const version = input.slice(at2 + 1);
+  const rawVersion = input.slice(at2 + 1);
   if (name.length > 214 || !NAME_RE.test(name)) {
     throw new ToolError(`Invalid package name "${name}"`);
   }
+  const version = rawVersion.replace(/^[v=]/, "");
+  if (BUILD_METADATA_RE.test(version)) {
+    throw new ToolError(
+      `npm never publishes versions with build metadata ("${rawVersion}"); use ${version.split("+")[0]}`
+    );
+  }
   if (!VERSION_RE.test(version)) {
-    throw new ToolError(`Expected an exact version such as 1.2.3, got "${version}"`);
+    throw new ToolError(`Expected an exact version such as 1.2.3, got "${rawVersion}"`);
   }
   return { name, version, purl: toPurl(name, version) };
 }
@@ -64511,7 +64518,9 @@ async function fetchPublished(input, options = {}) {
   const specString = `${spec.name}@${spec.version}`;
   const manifest = await registryJson(versionPath(spec), requestOptions);
   if (manifest === null) {
-    throw new ToolError(`${specString} was not found on ${registry}`);
+    throw new ToolError(
+      `${specString} was not found on ${registry}. If it was just published, retry in a minute or run the check after the publish job (needs: publish). A staged version that is not approved yet is checked with --stage <id>.`
+    );
   }
   if (!isRecord(manifest) || manifest.name !== spec.name || manifest.version !== spec.version) {
     const got = isRecord(manifest) ? `${String(manifest.name)}@${String(manifest.version)}` : "an unexpected document";
@@ -73474,6 +73483,8 @@ var PACK_TIME_SCRIPTS = [
   "prepublish"
 ];
 var NODE_CODENAMES = {
+  fermium: 14,
+  gallium: 16,
   hydrogen: 18,
   iron: 20,
   jod: 22,
@@ -73488,30 +73499,43 @@ function parseNodeMajor(text) {
   const majors = [...value.matchAll(/(?:^|[^0-9.])v?(\d{1,2})(?:\.(?:\d+|x|\*))?/g)].map((match) => Number(match[1])).filter((major) => major >= 10 && major <= 40);
   return majors.length > 0 ? Math.min(...majors) : void 0;
 }
+function resolveNodeSpec(raw, label, includeRawInSource = false) {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return void 0;
+  }
+  if (/^(lts\/\*|latest|current|node)$/i.test(trimmed)) {
+    return {
+      major: 24,
+      source: `${label} "${trimmed}" (assumed 24; use --node to override)`
+    };
+  }
+  const major = parseNodeMajor(trimmed);
+  if (major === void 0) {
+    return void 0;
+  }
+  return {
+    major,
+    source: includeRawInSource ? `${label} "${trimmed}"` : label
+  };
+}
 function nodeFromWorkflow(workflow, files) {
   const file = /node-version-file:\s*['"]?([^'"\s]+)/.exec(workflow)?.[1];
   if (file) {
     const name = file.replace(/^\.\//, "");
     const contents = files[name];
-    const major2 = contents ? parseNodeMajor(contents) : void 0;
-    if (major2 !== void 0) {
-      return { major: major2, source: `workflow node-version-file ${name}` };
+    const resolved = contents ? resolveNodeSpec(contents, `workflow node-version-file ${name}`) : void 0;
+    if (resolved) {
+      return resolved;
     }
   }
   const raw = /node-version:\s*['"]?([^'"\n]+)/.exec(workflow)?.[1]?.trim();
   if (!raw || raw.includes("${{")) {
     return void 0;
   }
-  if (/^(lts\/\*|latest|current|node)$/.test(raw)) {
-    return {
-      major: 24,
-      source: `workflow node-version "${raw}" (assumed 24; use --node to override)`
-    };
-  }
-  const major = parseNodeMajor(raw);
-  return major === void 0 ? void 0 : { major, source: `workflow node-version "${raw}"` };
+  return resolveNodeSpec(raw, "workflow node-version", true);
 }
-function chooseNode(inspection, pkg, root, overrides) {
+function chooseNode(inspection, pkg, root, overrides, warnings) {
   if (overrides.nodeMajor !== void 0) {
     return { major: overrides.nodeMajor, source: "--node option" };
   }
@@ -73521,18 +73545,31 @@ function chooseNode(inspection, pkg, root, overrides) {
       return fromWorkflow;
     }
   }
+  const unreadable = [];
+  const finish = (chosen) => {
+    for (const file of unreadable) {
+      warnings.push(
+        `${file.name} "${file.value}" not understood; using Node ${chosen.major} (${chosen.source})`
+      );
+    }
+    return chosen;
+  };
   for (const name of [".nvmrc", ".node-version"]) {
     const contents = inspection.nodeVersionFiles[name];
-    const major = contents ? parseNodeMajor(contents) : void 0;
-    if (major !== void 0) {
-      return { major, source: name };
+    if (contents === void 0) {
+      continue;
     }
+    const resolved = resolveNodeSpec(contents, name);
+    if (resolved) {
+      return finish(resolved);
+    }
+    unreadable.push({ name, value: (contents.trim().split(/\r?\n/)[0] ?? "").slice(0, 40) });
   }
   const tool = inspection.nodeVersionFiles[".tool-versions"];
   const toolLine = tool ? /^nodejs\s+(\S+)/m.exec(tool)?.[1] : void 0;
   const toolMajor = toolLine ? parseNodeMajor(toolLine) : void 0;
   if (toolMajor !== void 0) {
-    return { major: toolMajor, source: ".tool-versions" };
+    return finish({ major: toolMajor, source: ".tool-versions" });
   }
   for (const [info2, label] of [
     [pkg, "engines.node"],
@@ -73541,10 +73578,10 @@ function chooseNode(inspection, pkg, root, overrides) {
     const range = info2?.engines?.node;
     const major = range ? parseNodeMajor(range) : void 0;
     if (major !== void 0) {
-      return { major, source: `${label} "${range}"` };
+      return finish({ major, source: `${label} "${range}"` });
     }
   }
-  return { major: DEFAULT_NODE_MAJOR, source: "default" };
+  return finish({ major: DEFAULT_NODE_MAJOR, source: "default" });
 }
 var EXACT_VERSION_EXAMPLE = {
   npm: "npm@10.9.2",
@@ -73645,7 +73682,7 @@ function planBuild(input) {
   if (inspection.hasSubmodules) {
     warnings.push("repository uses git submodules; they are cloned at their recorded commits");
   }
-  const node = chooseNode(inspection, pkg, root, overrides);
+  const node = chooseNode(inspection, pkg, root, overrides, warnings);
   const image = overrides.image ?? `node:${node.major}-bookworm`;
   const rootDir = root ? REPO_DIR : `${REPO_DIR}/${pkg.dir}`;
   const pkgDir = pkg.dir === "." ? REPO_DIR : `${REPO_DIR}/${pkg.dir}`;
@@ -73933,6 +73970,12 @@ function readToolVersion(stdout) {
 function tail(text) {
   return text.length > OUTPUT_TAIL ? `\u2026${text.slice(-OUTPUT_TAIL)}` : text;
 }
+function formatTimeout(timeoutMs) {
+  if (timeoutMs > 0 && timeoutMs % 6e4 === 0) {
+    return `${timeoutMs / 6e4} min`;
+  }
+  return `${Math.round(timeoutMs / 1e3)} s`;
+}
 function textTail(result, includeStdout) {
   const parts = [result.stderr];
   if (includeStdout) {
@@ -73978,8 +74021,8 @@ async function rebuildPackage(source, target, options = {}) {
     });
     return outcome;
   }
-  function stageFailure(stage, outcome) {
-    const why = outcome.timedOut ? "timed out" : `exited with code ${outcome.exitCode ?? "unknown"}`;
+  function stageFailure(stage, outcome, timeoutMs) {
+    const why = outcome.timedOut ? `timed out after ${formatTimeout(timeoutMs)}` : `exited with code ${outcome.exitCode ?? "unknown"}`;
     return `${stage} stage ${why}`;
   }
   const serverVersion = await docker.serverVersion();
@@ -73987,6 +74030,7 @@ async function rebuildPackage(source, target, options = {}) {
   await docker.createVolume(volume);
   try {
     await docker.pull(baseImage);
+    const initTimeoutMs = 6e4;
     const init = await runStage(
       "init",
       {
@@ -73994,7 +74038,7 @@ async function rebuildPackage(source, target, options = {}) {
         network: "none",
         env: {},
         argv: ["bash", "-c", INIT_SCRIPT],
-        timeoutMs: 6e4,
+        timeoutMs: initTimeoutMs,
         user: "0:0",
         // Root in the container still lacks CAP_CHOWN after --cap-drop ALL; the volume is
         // empty at this point, so granting it here exposes nothing.
@@ -74003,7 +74047,7 @@ async function rebuildPackage(source, target, options = {}) {
       true
     );
     if (init.exitCode !== 0) {
-      return fail2(stageFailure("init", init));
+      return fail2(stageFailure("init", init, initTimeoutMs));
     }
     const cloneEnv = {
       RP_REPOSITORY: source.repository,
@@ -74025,7 +74069,7 @@ async function rebuildPackage(source, target, options = {}) {
       false
     );
     if (clone.exitCode !== 0) {
-      return fail2(stageFailure("clone", clone));
+      return fail2(stageFailure("clone", clone, timeouts.cloneMs));
     }
     const stdout = clone.stdout.toString("utf8");
     const markerAt = stdout.lastIndexOf(`${INSPECTION_MARKER}
@@ -74074,7 +74118,7 @@ async function rebuildPackage(source, target, options = {}) {
         // package managers print their errors on stdout as often as stderr
       );
       if (install.exitCode !== 0) {
-        return fail2(stageFailure("install", install));
+        return fail2(stageFailure("install", install, timeouts.installMs));
       }
       toolVersion = readToolVersion(install.stdout);
     } else {
@@ -74094,7 +74138,7 @@ async function rebuildPackage(source, target, options = {}) {
       true
     );
     if (build.exitCode !== 0) {
-      return fail2(stageFailure("build", build));
+      return fail2(stageFailure("build", build, timeouts.buildMs));
     }
     toolVersion ??= readToolVersion(build.stdout);
     result.toolVersion = toolVersion ? `${buildPlan.manager.name.replace("-berry", "").replace("-classic", "")} ${toolVersion}` : void 0;
@@ -74104,6 +74148,7 @@ async function rebuildPackage(source, target, options = {}) {
     if (!expectedSha) {
       return fail2("build stage did not report the tarball digest");
     }
+    const exportTimeoutMs = 5 * 6e4;
     const exported = await runStage(
       "export",
       {
@@ -74111,13 +74156,13 @@ async function rebuildPackage(source, target, options = {}) {
         network: "none",
         env: {},
         argv: ["cat", "/work/out/package.tgz"],
-        timeoutMs: 5 * 6e4,
+        timeoutMs: exportTimeoutMs,
         volumeReadOnly: true
       },
       false
     );
     if (exported.exitCode !== 0) {
-      return fail2(stageFailure("export", exported));
+      return fail2(stageFailure("export", exported, exportTimeoutMs));
     }
     const sha = createHash4("sha256").update(exported.stdout).digest("hex");
     if (sha !== expectedSha) {
@@ -74584,6 +74629,12 @@ function canonical(value) {
 function same(a2, b2) {
   return canonical(a2) === canonical(b2);
 }
+var NON_REGISTRY_SPEC_PREFIX = /^(?:git\+|git:|git@|github:|gitlab:|bitbucket:|gist:|https?:|file:|link:|npm:)/i;
+var GITHUB_SHORTHAND = /^[a-z0-9_.-]+\/[a-z0-9_.-]+(?:#.+)?$/i;
+function isNonRegistrySpec(range) {
+  const trimmed = range.trim();
+  return NON_REGISTRY_SPEC_PREFIX.test(trimmed) || GITHUB_SHORTHAND.test(trimmed);
+}
 function describeDependency(field, name) {
   return field === "dependencies" ? name : `${name} (${field})`;
 }
@@ -74711,13 +74762,15 @@ function manifestRules(context4) {
             evidence: { field, name, range }
           });
         } else if (expectedDeps[name] !== range) {
+          const expectedRange = expectedDeps[name];
+          const repointed = isNonRegistrySpec(range) && !isNonRegistrySpec(expectedRange);
           findings.push({
             id: "dependency-changed",
-            severity: "medium",
+            severity: isNonRegistrySpec(range) && !isNonRegistrySpec(expectedRange) ? "high" : "medium",
             title: `dependency range changed: ${describeDependency(field, name)}`,
-            detail: `${name} is "${range}" in the release and "${expectedDeps[name]}" in the source.`,
+            detail: repointed ? `${name} is "${range}" in the release and "${expectedRange}" in the source. Repointing a registry dependency to a non-registry URL, local path or package alias can install code the source did not ask for.` : `${name} is "${range}" in the release and "${expectedRange}" in the source.`,
             paths: ["package.json"],
-            evidence: { field, name, release: range, rebuild: expectedDeps[name] }
+            evidence: { field, name, release: range, rebuild: expectedRange }
           });
         }
       }
@@ -75185,19 +75238,21 @@ async function runCheck(options, deps = defaultDeps) {
   };
   let artifact;
   if (options.stageId) {
+    const expected = options.spec ? parseSpec(options.spec) : void 0;
     log(`fetching staged version ${options.stageId}`);
     artifact = await deps.fetchStaged(options.stageId, registryOptions);
-    if (options.spec) {
-      const expected = parseSpec(options.spec);
+    if (expected) {
       if (expected.name !== artifact.name || expected.version !== artifact.version) {
         throw new ToolError(
-          `Staged ${options.stageId} is ${artifact.name}@${artifact.version}, not ${options.spec}`
+          `Staged ${options.stageId} is ${artifact.name}@${artifact.version}, not ${expected.name}@${expected.version}`
         );
       }
     }
   } else if (options.spec) {
-    log(`fetching ${options.spec}`);
-    artifact = await deps.fetchPublished(options.spec, registryOptions);
+    const parsed = parseSpec(options.spec);
+    const normalizedSpec = `${parsed.name}@${parsed.version}`;
+    log(`fetching ${normalizedSpec}`);
+    artifact = await deps.fetchPublished(normalizedSpec, registryOptions);
   } else {
     throw new ToolError("Give a package as <name>@<version>, or --stage <id> for a staged version");
   }

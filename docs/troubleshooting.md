@@ -24,6 +24,8 @@ Rebuild      FAILED (4m 12s)  install stage exited with code 1
 - `build stage timed out` / `build stage exited with code <N>`
 - `export stage timed out` / `export stage exited with code <N>`
 
+A timed-out stage also names its time limit, for example `build stage timed out after 30 min`.
+
 **What it means:** One of the Docker container stages (`init`, `clone`, `install`, `build`, or
 `export`) exceeded its timeout (10 minutes for `clone`, 20 minutes for `install`, 30 minutes
 for `build`) or returned a non-zero exit status. When the stage produced output, the text

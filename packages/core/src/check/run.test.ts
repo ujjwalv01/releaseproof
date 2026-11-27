@@ -103,6 +103,30 @@ describe("runCheck", () => {
     expect(log.mock.calls.map((c) => c[0])).toContain("provenance: verified");
   });
 
+  it("rejects an invalid spec before logging fetching or calling the registry", async () => {
+    const deps = depsFor({ release: "clean" });
+    const fetchPublished = vi.fn(deps.fetchPublished);
+    const log = vi.fn();
+    await expect(
+      runCheck({ spec: "left-pad@latest", log }, { ...deps, fetchPublished }),
+    ).rejects.toThrow(/exact version/);
+    expect(fetchPublished).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("normalizes a v-prefixed or =-prefixed spec before fetching", async () => {
+    const deps = depsFor({ release: "clean" });
+    const fetchPublished = vi.fn(deps.fetchPublished);
+    const log = vi.fn();
+    const report = await runCheck(
+      { spec: "@releaseproof/fixture@v1.0.0", log },
+      { ...deps, fetchPublished },
+    );
+    expect(fetchPublished).toHaveBeenCalledWith("@releaseproof/fixture@1.0.0", expect.any(Object));
+    expect(log).toHaveBeenCalledWith("fetching @releaseproof/fixture@1.0.0");
+    expect(report.package.version).toBe("1.0.0");
+  });
+
   it("matches a clean release", async () => {
     const report = await runCheck(
       { spec: "@releaseproof/fixture@1.0.0" },

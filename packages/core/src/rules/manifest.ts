@@ -90,6 +90,16 @@ function same(a: unknown, b: unknown): boolean {
   return canonical(a) === canonical(b);
 }
 
+const NON_REGISTRY_SPEC_PREFIX =
+  /^(?:git\+|git:|git@|github:|gitlab:|bitbucket:|gist:|https?:|file:|link:|npm:)/i;
+const GITHUB_SHORTHAND = /^[a-z0-9_.-]+\/[a-z0-9_.-]+(?:#.+)?$/i;
+
+/** True when a dependency spec points outside the default registry or aliases another package. */
+export function isNonRegistrySpec(range: string): boolean {
+  const trimmed = range.trim();
+  return NON_REGISTRY_SPEC_PREFIX.test(trimmed) || GITHUB_SHORTHAND.test(trimmed);
+}
+
 function describeDependency(field: string, name: string): string {
   return field === "dependencies" ? name : `${name} (${field})`;
 }
@@ -222,13 +232,18 @@ export function manifestRules(context: RuleContext): Finding[] {
             evidence: { field, name, range },
           });
         } else if (expectedDeps[name] !== range) {
+          const expectedRange = expectedDeps[name] as string;
+          const repointed = isNonRegistrySpec(range) && !isNonRegistrySpec(expectedRange);
           findings.push({
             id: "dependency-changed",
-            severity: "medium",
+            severity:
+              isNonRegistrySpec(range) && !isNonRegistrySpec(expectedRange) ? "high" : "medium",
             title: `dependency range changed: ${describeDependency(field, name)}`,
-            detail: `${name} is "${range}" in the release and "${expectedDeps[name]}" in the source.`,
+            detail: repointed
+              ? `${name} is "${range}" in the release and "${expectedRange}" in the source. Repointing a registry dependency to a non-registry URL, local path or package alias can install code the source did not ask for.`
+              : `${name} is "${range}" in the release and "${expectedRange}" in the source.`,
             paths: ["package.json"],
-            evidence: { field, name, release: range, rebuild: expectedDeps[name] },
+            evidence: { field, name, release: range, rebuild: expectedRange },
           });
         }
       }
