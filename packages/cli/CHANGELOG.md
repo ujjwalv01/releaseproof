@@ -1,5 +1,51 @@
 # releaseproof
 
+## 0.3.0
+
+### Minor Changes
+
+- [#212](https://github.com/ujjwalv01/releaseproof/pull/212) [`78b4156`](https://github.com/ujjwalv01/releaseproof/commit/78b4156b0991f62a664787615471456eedcbd08d) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Expose `findings` and `highest-severity` outputs from the GitHub Action so workflows can branch on finding counts and severity without parsing `releaseproof-report.json`.
+
+- [#221](https://github.com/ujjwalv01/releaseproof/pull/221) [`a20747c`](https://github.com/ujjwalv01/releaseproof/commit/a20747c49ceb888067edc55e134676519bdf5673) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Add `rekor` input to the GitHub Action (default: `"true"`) to allow skipping Rekor transparency log lookups for staged versions, matching the CLI's `--no-rekor`.
+
+- [#209](https://github.com/ujjwalv01/releaseproof/pull/209) [`0148112`](https://github.com/ujjwalv01/releaseproof/commit/0148112ae58a731fdf300c20dc4c7aff42b6ab91) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Add `--patch-lines <n>` to `releaseproof check` to control how many diff lines are shown per changed file in the text report (`0` for none).
+
+- [#199](https://github.com/ujjwalv01/releaseproof/pull/199) [`13dee10`](https://github.com/ujjwalv01/releaseproof/commit/13dee101536f75307c1fc4d97b1c8b143e83e2b7) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Add `--report <path>` to `releaseproof check` to write the pretty-printed JSON report to a file alongside the normal stdout output.
+
+### Patch Changes
+
+- [#226](https://github.com/ujjwalv01/releaseproof/pull/226) [`b3598bc`](https://github.com/ujjwalv01/releaseproof/commit/b3598bcd312154c1512488572a286fd0e4362bb9) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Accept versions with a leading `v` or `=` (such as `v1.2.3`) in the CLI and GitHub Action, reject build metadata that npm never publishes, and validate the spec before logging the fetch step.
+
+- [#229](https://github.com/ujjwalv01/releaseproof/pull/229) [`0649403`](https://github.com/ujjwalv01/releaseproof/commit/0649403535c50097d305d09a499ba77e1b78859d) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Reuse an existing open issue with the same title and labels in the GitHub Action (`create-issue: "true"`) by commenting on it instead of opening a duplicate issue on every run.
+
+- [#210](https://github.com/ujjwalv01/releaseproof/pull/210) [`568612f`](https://github.com/ujjwalv01/releaseproof/commit/568612f691f575dced2d1217debefcd45242822c) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Link each finding in the Action job summary and issue body directly to its rule anchor on the documentation website (`rules.html#<id>`).
+
+- [#225](https://github.com/ujjwalv01/releaseproof/pull/225) [`f36e0da`](https://github.com/ujjwalv01/releaseproof/commit/f36e0daabd4753e6c6f4c4bfab6fe4e6a97b9900) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Raise `dependency-changed` severity to `high` when a registry dependency range is repointed to a non-registry URL (git, tarball, `file:`, `link:`, `owner/repo` shorthand) or `npm:` package alias.
+
+- [#177](https://github.com/ujjwalv01/releaseproof/pull/177) [`a3c2a17`](https://github.com/ujjwalv01/releaseproof/commit/a3c2a172e1d860fa1276fd8318ce029f7bc1f55a) Thanks [@jeelthacker1](https://github.com/jeelthacker1)! - Accept legacy npm package names containing uppercase letters while preserving their published casing in registry requests and attestation identifiers.
+
+- [#218](https://github.com/ujjwalv01/releaseproof/pull/218) [`a28ab64`](https://github.com/ujjwalv01/releaseproof/commit/a28ab646792613b675bbad75ff952b42dfeb1e1a) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Log a progress note when verified provenance certifies a source commit and a different `--commit` value is ignored.
+
+- [#217](https://github.com/ujjwalv01/releaseproof/pull/217) [`e8d53a1`](https://github.com/ujjwalv01/releaseproof/commit/e8d53a184c5049e64f73458f6789c9f0717b278e) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Require a `k`, `m` or `g` unit and at least 6 MiB (Docker's minimum) for `--memory` and the Action's `memory` input so `0` or unitless byte counts cannot disable or break container memory limits.
+
+- [#224](https://github.com/ujjwalv01/releaseproof/pull/224) [`65c03af`](https://github.com/ujjwalv01/releaseproof/commit/65c03aff8f5751a39c88eca779e9668e26aa5b86) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Add an actionable hint to the `was not found` registry error for just-published and staged versions, and document how to sequence the GitHub Action after `npm publish`.
+
+- [#228](https://github.com/ujjwalv01/releaseproof/pull/228) [`b35d12b`](https://github.com/ujjwalv01/releaseproof/commit/b35d12be3b99597c4e98ad4689984733ffee18c7) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Handle Node.js aliases (`lts/*`, `latest`, `current`, `node`) and older LTS codenames (`lts/gallium`, `lts/fermium`) in `.nvmrc` and `.node-version`, and add a build plan warning when a version file cannot be parsed.
+
+- [#179](https://github.com/ujjwalv01/releaseproof/pull/179) [`be058db`](https://github.com/ujjwalv01/releaseproof/commit/be058db43badd5acdd8298dce6c767256fa6eaf7) Thanks [@jeelthacker1](https://github.com/jeelthacker1)! - Require explicit package and version inputs for published checks against private monorepo roots, instead of looking up an unpublished root package. Stage-only checks can still omit the package spec.
+
+- [#223](https://github.com/ujjwalv01/releaseproof/pull/223) [`067c883`](https://github.com/ujjwalv01/releaseproof/commit/067c883ee0e216a9d440d33855c582b3b02601e6) Thanks [@aviraltrip](https://github.com/aviraltrip)! - Reject registry URLs containing embedded user names or passwords so credentials are never echoed in errors or sent to fetch.
+
+- [#178](https://github.com/ujjwalv01/releaseproof/pull/178) [`3f92669`](https://github.com/ujjwalv01/releaseproof/commit/3f9266954e50f1db2f99a799cbac0d8143a703e9) Thanks [@jeelthacker1](https://github.com/jeelthacker1)! - Analyze scripts starting with a shebang for obfuscation and minification when the rebuild does not produce their contents, even if the file has no known code extension.
+
+- [#219](https://github.com/ujjwalv01/releaseproof/pull/219) [`6b5d3ea`](https://github.com/ujjwalv01/releaseproof/commit/6b5d3ea826e39f11d8b33b3d9a22a59a45038569) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Strictly validate `--node` and the Action's `node` input with shared `parseNodeMajorOption` to reject non-decimal literals such as `0x16`, `1e1` and `22.0`.
+
+- [#227](https://github.com/ujjwalv01/releaseproof/pull/227) [`0648258`](https://github.com/ujjwalv01/releaseproof/commit/0648258d90e07c8aedbfc86e0e82bdb5a1a102df) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Include the stage time limit in timed-out rebuild failure messages (e.g. `build stage timed out after 30 min` or `after 90 s`).
+
+- [#216](https://github.com/ujjwalv01/releaseproof/pull/216) [`3b81e19`](https://github.com/ujjwalv01/releaseproof/commit/3b81e19c09645c845a24860c795428ae19279638) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Flag `.env.*` variants (excluding `.env.example`, `.env.sample` and `.env.template`), nested `.env` and `.npmrc` files, and `id_dsa` / `id_ecdsa` / `id_ed25519` (including `_sk`) SSH private keys in `unexpected-path`.
+
+- [#208](https://github.com/ujjwalv01/releaseproof/pull/208) [`107eef0`](https://github.com/ujjwalv01/releaseproof/commit/107eef0b306d73790b51a224fe6b3c0444b17ab0) Thanks [@Burakceliks](https://github.com/Burakceliks)! - Validate `--report` parent directory and target path writability before running the check so unwritable paths fail immediately instead of after a rebuild.
+
 ## 0.2.2
 
 ### Patch Changes
