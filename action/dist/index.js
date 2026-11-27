@@ -75780,6 +75780,13 @@ ${footer}
 }
 
 // src/main.ts
+var TRUSTED_AUTHOR_ASSOCIATIONS = /* @__PURE__ */ new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+function selectReusableIssue(issues, title) {
+  const match = issues.find(
+    (issue2) => !issue2.pull_request && issue2.title === title && (issue2.user?.type === "Bot" || issue2.author_association !== void 0 && TRUSTED_AUTHOR_ASSOCIATIONS.has(issue2.author_association))
+  );
+  return match ? { number: match.number, url: match.html_url } : void 0;
+}
 async function reportIssue(io2, args) {
   let existing;
   try {
@@ -75930,8 +75937,7 @@ await runAction({
       ...labels.length > 0 ? { labels: labels.join(",") } : {},
       per_page: 100
     });
-    const match = data.find((issue2) => !issue2.pull_request && issue2.title === title);
-    return match ? { number: match.number, url: match.html_url } : void 0;
+    return selectReusableIssue(data, title);
   },
   commentOnIssue: async ({ token, issueNumber, body }) => {
     const octokit = getOctokit(token);

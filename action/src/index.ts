@@ -3,7 +3,7 @@ import path from "node:path";
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { runCheck } from "@releaseproof/core";
-import { runAction } from "./main.js";
+import { runAction, selectReusableIssue } from "./main.js";
 
 const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
 const { context } = github;
@@ -38,8 +38,7 @@ await runAction({
       ...(labels.length > 0 ? { labels: labels.join(",") } : {}),
       per_page: 100,
     });
-    const match = data.find((issue) => !issue.pull_request && issue.title === title);
-    return match ? { number: match.number, url: match.html_url } : undefined;
+    return selectReusableIssue(data, title);
   },
   commentOnIssue: async ({ token, issueNumber, body }) => {
     const octokit = github.getOctokit(token);

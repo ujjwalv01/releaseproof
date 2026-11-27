@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { type CheckReport, ToolError } from "@releaseproof/core";
 import { describe, expect, it, vi } from "vitest";
-import { type ActionIo, runAction } from "./main.js";
+import { type ActionIo, runAction, selectReusableIssue } from "./main.js";
 
 const sha = "a".repeat(40);
 
@@ -393,5 +393,78 @@ describe("runAction", () => {
     );
     expect(io.issues).toHaveLength(1);
     expect(io.outputs["issue-url"]).toBe("https://github.com/ujjwalv01/releaseproof/issues/1");
+  });
+});
+
+describe("selectReusableIssue", () => {
+  const title = "releaseproof: demo@1.2.3 differs-from-source";
+
+  it("ignores an outsider's open issue with the same title", () => {
+    const result = selectReusableIssue(
+      [
+        {
+          number: 10,
+          html_url: "https://github.com/ujjwalv01/releaseproof/issues/10",
+          title,
+          user: { type: "User" },
+          author_association: "NONE",
+        },
+        {
+          number: 11,
+          html_url: "https://github.com/ujjwalv01/releaseproof/issues/11",
+          title,
+          user: { type: "User" },
+          author_association: "CONTRIBUTOR",
+        },
+      ],
+      title,
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it("reuses an open issue opened by a bot", () => {
+    const result = selectReusableIssue(
+      [
+        {
+          number: 12,
+          html_url: "https://github.com/ujjwalv01/releaseproof/issues/12",
+          title,
+          user: { type: "Bot" },
+          author_association: "NONE",
+        },
+      ],
+      title,
+    );
+    expect(result).toEqual({
+      number: 12,
+      url: "https://github.com/ujjwalv01/releaseproof/issues/12",
+    });
+  });
+
+  it("reuses an open issue opened by a repository maintainer and skips pull requests", () => {
+    const result = selectReusableIssue(
+      [
+        {
+          number: 13,
+          html_url: "https://github.com/ujjwalv01/releaseproof/pull/13",
+          title,
+          pull_request: {},
+          user: { type: "User" },
+          author_association: "OWNER",
+        },
+        {
+          number: 14,
+          html_url: "https://github.com/ujjwalv01/releaseproof/issues/14",
+          title,
+          user: { type: "User" },
+          author_association: "COLLABORATOR",
+        },
+      ],
+      title,
+    );
+    expect(result).toEqual({
+      number: 14,
+      url: "https://github.com/ujjwalv01/releaseproof/issues/14",
+    });
   });
 });

@@ -34,6 +34,33 @@ export interface ActionIo {
   check(options: Parameters<typeof runCheck>[0]): Promise<CheckReport>;
 }
 
+export interface ListedIssue {
+  number: number;
+  html_url: string;
+  title: string;
+  pull_request?: unknown;
+  user?: { type?: string } | null;
+  author_association?: string;
+}
+
+const TRUSTED_AUTHOR_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+
+/** Pick an existing open issue to comment on, ignoring pull requests and untrusted authors. */
+export function selectReusableIssue(
+  issues: readonly ListedIssue[],
+  title: string,
+): { number: number; url: string } | undefined {
+  const match = issues.find(
+    (issue) =>
+      !issue.pull_request &&
+      issue.title === title &&
+      (issue.user?.type === "Bot" ||
+        (issue.author_association !== undefined &&
+          TRUSTED_AUTHOR_ASSOCIATIONS.has(issue.author_association))),
+  );
+  return match ? { number: match.number, url: match.html_url } : undefined;
+}
+
 async function reportIssue(
   io: ActionIo,
   args: { token: string; title: string; body: string; labels: string[] },
