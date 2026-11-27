@@ -3,7 +3,7 @@ import path from "node:path";
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { runCheck } from "@releaseproof/core";
-import { runAction } from "./main.js";
+import { runAction, selectReusableIssue } from "./main.js";
 
 const workspace = process.env.GITHUB_WORKSPACE ?? process.cwd();
 const { context } = github;
@@ -29,6 +29,24 @@ await runAction({
     const file = path.join(workspace, relativePath);
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, contents);
+  },
+  findOpenIssue: async ({ token, title, labels }) => {
+    const octokit = github.getOctokit(token);
+    const { data } = await octokit.rest.issues.listForRepo({
+      ...context.repo,
+      state: "open",
+      ...(labels.length > 0 ? { labels: labels.join(",") } : {}),
+      per_page: 100,
+    });
+    return selectReusableIssue(data, title);
+  },
+  commentOnIssue: async ({ token, issueNumber, body }) => {
+    const octokit = github.getOctokit(token);
+    await octokit.rest.issues.createComment({
+      ...context.repo,
+      issue_number: issueNumber,
+      body,
+    });
   },
   createIssue: async ({ token, title, body, labels }) => {
     const octokit = github.getOctokit(token);

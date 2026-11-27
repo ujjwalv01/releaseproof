@@ -9,7 +9,8 @@ write `uses: ujjwalv01/releaseproof@<sha>`.
 
 `releaseproof/action` runs `releaseproof check` for one package version inside a workflow
 and reports the verdict three ways: the job summary (always), the job status (configurable
-with `fail-on`), and optionally an issue. When the check itself cannot run (a tool error
+with `fail-on`), and optionally an issue (reusing an existing open issue with the same title
+and labels by adding a comment instead of opening a duplicate). When the check itself cannot run (a tool error
 such as registry unreachable or Docker unavailable), the job fails closed whatever `fail-on`
 says; to keep a workflow going anyway, set `continue-on-error: true` on the step and read
 `steps.<id>.outputs.verdict`. The full JSON report is written to a file the
